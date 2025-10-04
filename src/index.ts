@@ -1,5 +1,8 @@
 import express from 'express';
 import healthRouter from './routes/health';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 
