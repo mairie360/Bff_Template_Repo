@@ -116,11 +116,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://core:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"] # <--- Doit être 3000
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
 
   #add other apis if needed
 
@@ -161,10 +161,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://{bff}:{port}/health"] #change bff name #change port
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
 
   nginx:
     image: nginx:1.27.4-bookworm
