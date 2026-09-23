@@ -4,16 +4,13 @@ on: pull_request_target
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    # On ajoute explicitement les permissions ici
     permissions:
       pull-requests: write
       contents: write
-    if: github.actor == 'renovate[bot]'
+    # Match the PR author, not the event actor, so a Renovate PR is still approved
+    # after a maintainer pushes a fix or updates the branch.
+    if: github.event.pull_request.user.login == 'renovate[bot]'
     steps:
       - uses: hmarr/auto-approve-action@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          
-      # - uses: hmarr/auto-approve-action@v4
-      #   with:
-      #     github-token: ${{ secrets.MY_TECH_ACCOUNT_PAT }}
