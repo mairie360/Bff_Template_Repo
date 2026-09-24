@@ -1,40 +1,56 @@
 # Bff_Template_Repo
 
-## 🏗️ Dépôt Modèle pour Backend for Frontend (BFF)
+Template of the Mairie360 Backend-for-Frontend (BFF) repositories: an Express 5 + TypeScript
+service with the same skeleton as the BFFs (`BFF_user`, `BFF_Settings`, ...), its OpenAPI contract
+generated from the code, a Core API client built on the published `@mairie360/core-api-openapi`
+package, and the ZAP / k6 test stacks with the OpenAPI coverage gate.
 
-Ce dépôt sert de point de départ pour créer une application BFF (Backend for Frontend) destinée à interagir avec différents microservices.
+## Layout
 
----
+- `src/app.ts`: the Express app (security headers, JSON 404/400, `/docs`, `/openapi.json`,
+  `/swagger.json`); `src/index.ts` starts it on `PORT`.
+- `src/openapi-registry.ts`: the `zod-to-openapi` registry. Every route module in `src/routes/`
+  registers its paths and schemas on import; `src/openapi.ts` imports them and builds the document.
+- `src/clients/`: `upstream.ts` (caller session, upstream base URL, error answers) and
+  `coreClient.ts`, which wraps the generated Core API client. Wrap every other upstream API the same
+  way, from its `@mairie360/<name>-api-openapi` package.
+- `src/routes/`: `GET /health`, `GET /check_apis` (upstream reachability) and an example
+  authenticated route, `GET /example/profile`, which forwards the caller's session to Core API.
+- `contracts/openapi.json` + `contracts/bff.d.ts`: the generated contract, committed.
+- `tests/`: unit tests, the Core API contract tests (`upstream-contracts.test.ts`) and the whole
+  app against a contract-driven Core API mock (`example.upstream-mocks.test.ts`). The files of
+  `tests/support/` are shared verbatim with the BFFs: keep them identical.
 
-## ✨ Fonctionnalités
+## Commands
 
-- Serveur basé sur **Express.js**
-- Développement en **TypeScript** pour une meilleure sécurité et expérience
-- Gestion des variables d’environnement avec **dotenv**
-- Route de vérification de santé (health check) intégrée
-- Support **Docker** pour la conteneurisation
-- Gestion basique des erreurs
-
----
-
-## ⚠️ Important
-
-Avant de lancer l’application, pensez à définir la variable d’environnement `PORT`.
-
-Créez un fichier `.env` à la racine du projet avec le contenu suivant :
-
-```env
-PORT=3000
-```
-
-## 🚀 Démarrage Rapide
+`@mairie360/*` packages come from GitHub Packages: export `NODE_AUTH_TOKEN` (a token with
+`read:packages`) before `npm ci` (see `.npmrc`).
 
 ```bash
-# Construire l'image Docker
-docker build -t bff-template .
+npm ci
+npm run start                # tsx watch, port 4000 by default (PORT, CORE_API_URL: see .env.example)
+npm run build                # tsc --noEmit, then esbuild bundles dist/index.js
+npm run lint
+npm test                     # jest; CI runs npm test -- --runInBand
+npm run contracts:generate   # after any route, schema or status change: commit contracts/
+npm run contracts:check      # CI gate: fails when contracts/ is stale
+```
 
-# Lancer le conteneur
-docker run -p 3000:3000 --env-file .env bff-template
+`docker compose up --build` runs the BFF alone against a Core API on the host's port 3000
+(`CORE_API_URL` overrides it). The production `Dockerfile` and `development.Dockerfile` read the
+GitHub Packages credentials from BuildKit secrets:
+
+```bash
+docker build --secret id=npmrc,src=.npmrc --secret id=node_auth_token,env=NODE_AUTH_TOKEN -t bff-<name> .
+```
+
+## CI
+
+`.github/workflows/contracts.yml` runs lint, build, `contracts:check` and the tests on every push.
+`.github/workflows/cicd.yml` (the reusable `mairie360/CICD` `BFFs-cicd.yml` workflow: release,
+image, ZAP and k6 stacks) is commented out on the template, which must not publish a package or an
+image: uncomment it in the BFF created from it.
+
 ## Security test stack (OWASP ZAP)
 
 `./security_test.sh` (with `NODE_AUTH_TOKEN` exported) starts the isolated stack of
@@ -69,18 +85,22 @@ run: `crud` (2 VUs) calls every handler once per iteration, writes included, and
 family (50 ms for `/health`, 150 ms for `/check_apis`, 400 ms for reads, 800 ms for writes), with
 `http_req_failed < 1%` and `checks > 99%`.
 
-`contracts/openapi.json` is the committed contract: `npx ts-node scripts/export-swagger.ts` rewrites it
-from the document the BFF serves, after any route or schema change.
+`contracts/openapi.json` is the reference of both gates: regenerate it with
+`npm run contracts:generate` after any route or schema change.
 
-When creating a BFF from this template:
+## Creating a BFF from this template
 
-- replace `{bff}` and `{port}` in `docker-compose-security.yml`, `docker-compose-performance.yml`,
-  `security_test.sh` and `performance_test.sh` (lines marked `#change ...`) and add the upstream APIs
-  the BFF calls to both stacks;
-- write one `load-test.js` handler per operation (writes restore the seed they change) and
-  regenerate `contracts/openapi.json`;
-- set `package_name` in `.github/workflows/cicd.yml`, uncomment it, and name the spec in
-  `src/openapi.ts`; import every new route module in `src/openapi.ts`;
+- replace `{bff}` and `{port}` on the lines marked `#change ...` (`docker-compose*.yml`,
+  `security_test.sh`, `performance_test.sh`, `.github/workflows/cicd.yml`) and the default port in
+  `src/index.ts`, `Dockerfile` and `.env.example`; name the package in `package.json` and the spec
+  in `src/openapi.ts`;
+- uncomment `.github/workflows/cicd.yml` and set its `package_name`;
+- replace `src/routes/example.ts` with the BFF's routes (import every route module in
+  `src/openapi.ts`), add the upstream API clients it needs in `src/clients/` and their probe in
+  `src/routes/check_apis.ts`, then run `npm run contracts:generate`;
+- add the upstream APIs the BFF calls to both test stacks, and remove `bff-user` if it does not
+  call it;
+- write one `load-test.js` handler per operation (writes restore the seed they change);
 - give every request field, query and path parameter of the contract a valid example, with a
   distinct example for DELETE routes, and seed the rows they name in `init-test.sql`;
 - keep the quotes around `'Bearer <jwt>'`: `zap-api-scan.py` splits `-z` with `shlex`, and an

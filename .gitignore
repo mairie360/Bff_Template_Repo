@@ -5,9 +5,18 @@ dist/
 .idea/
 .vscode/
 coverage/
-src/services/generated/
+
+# Written by scripts/export-swagger.ts for the OpenAPI publishing workflow; contracts/ is committed.
 openapi.json
+openapi.yaml
 !contracts/openapi.json
+
+# Reports written by the security / performance tests
+.zap/*.html
+.zap/*.json
+.zap/*.md
+zap.yaml
+summary.json
 
 # mairie360/CICD checkout (shared ZAP / k6 test files), cloned by security_test.sh and
 # performance_test.sh, and by the CI jobs.
