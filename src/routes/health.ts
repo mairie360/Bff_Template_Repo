@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { registry } from '../openapi-registry';
 
 const router = Router();
@@ -8,15 +9,16 @@ registry.registerPath({
   path: '/health',
   security: [],
   tags: ['Connectivity'],
-  summary: "Vérifie la santé du BFF",
+  summary: 'Checks that the BFF is up',
   responses: {
     200: {
       description: 'OK',
-    }
+      content: { 'application/json': { schema: z.object({ status: z.literal('ok') }) } },
+    },
   },
 });
 
-router.get('/', (req, res) => {
+router.get('/', (_req, res) => {
   res.json({ status: 'ok' });
 });
 

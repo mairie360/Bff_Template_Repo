@@ -1,20 +1,21 @@
-# Étape 1 : build
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+# Development image: runs the TypeScript sources with tsx watch (npm run start). The security and
+# performance stacks build it as bff-<name>:local when IMAGE_REF is empty.
+FROM node:24-alpine
 
-# Étape 2 : run
-FROM node:20-alpine
-# AJOUT DE CURL ICI (Alpine utilise apk)
+# curl for the Docker healthchecks.
 RUN apk add --no-cache curl
 
 WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/package*.json ./
-RUN npm ci --omit=dev
 
-ENV NODE_ENV=production
-CMD ["node", "dist/index.js"]
+# Dependency manifests first, for the Docker layer cache.
+COPY package*.json tsconfig.json ./
+
+# Full install (with devDependencies). The GitHub Packages credentials are only available
+# during this step.
+RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
+    --mount=type=secret,id=node_auth_token,env=NODE_AUTH_TOKEN \
+    npm ci
+
+COPY . .
+
+CMD ["npm", "run", "start"]
