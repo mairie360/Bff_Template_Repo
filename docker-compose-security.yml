@@ -1,13 +1,17 @@
 # Isolated dynamic security test stack (DAST) of the BFF.
 #
-#   ./security_test.sh            (local)
-#   docker compose -f docker-compose-security.yml up --build \
-#       --abort-on-container-exit --exit-code-from security-scan   (CI)
+#   ./security_test.sh                     (local)
+#   IMAGE_REF=<image> ./security_test.sh   (CI: the image published by release-dev)
+#
+# The BFF under test is never built by this file: it runs the image named by
+# IMAGE_REF, which the CI sets to the dev image built once by release-dev and
+# then promoted to staging and prod. When IMAGE_REF is empty, the script builds
+# bff-{bff}:local from development.Dockerfile first (NODE_AUTH_TOKEN and ./.npmrc
+# are needed to read the @mairie360/* packages).
 #
 # security-scan (OWASP ZAP) imports /openapi.json, replays every operation with a
 # valid admin JWT (replacer) and fails on any WARN/FAIL alert not neutralized in
 # .zap/rules.tsv (informational alerts are set to IGNORE there).
-# NODE_AUTH_TOKEN must be exported for the local build (read access to @mairie360/*).
 #
 # Template placeholders: replace {bff} with the BFF name and {port} with its port,
 # and add the upstream APIs the BFF calls (with their *-ready probe) next to core-api.
@@ -20,12 +24,6 @@ volumes:
 
 networks:
   backend:
-
-secrets:
-  npmrc:
-    file: ./.npmrc
-  node_auth_token:
-    environment: NODE_AUTH_TOKEN
 
 x-db-env: &db-env
   DB_TYPE: postgres
@@ -166,14 +164,8 @@ services:
       start_period: 40s
 
   bff-{bff}: #change bff name
-    image: ${TARGET_IMAGE:-bff-{bff}:security} #change bff name
+    image: ${IMAGE_REF:-bff-{bff}:local} #change bff name
     container_name: bff-{bff}-sec-bff #change bff name
-    build:
-      context: .
-      dockerfile: development.Dockerfile
-      secrets:
-        - npmrc
-        - node_auth_token
     depends_on:
       seeder:
         condition: service_completed_successfully
