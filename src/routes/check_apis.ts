@@ -11,6 +11,7 @@ const CALENDAR_FULL_URL = `http://${process.env.CALENDAR_API_URL}:${process.env.
 registry.registerPath({
   method: 'get',
   path: '/check_apis',
+  security: [],
   tags: ['Connectivity'],
   summary: "Vérifie la connexion avec l'API Core et Calendar (Rust)",
   responses: {

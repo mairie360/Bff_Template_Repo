@@ -1,9 +1,9 @@
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
-import swaggerJsdoc from 'swagger-jsdoc';
 import healthRouter from './routes/health';
 import checkApis from './routes/check_apis';
 import dotenv from 'dotenv';
+import { openApiDocument } from './openapi';
 
 dotenv.config();
 
@@ -11,35 +11,14 @@ const app = express();
 
 const PORT = process.env.PORT;
 
-const swaggerOptions: swaggerJsdoc.Options = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'BFF API',
-      version: '1.0.0',
-      description: 'Documentation du BFF gérant la vérification des services',
-    },
-    servers: [
-      {
-        url: `http://localhost:${PORT}`,
-        description: 'Serveur local',
-      },
-    ],
-  },
-  // On pointe vers les fichiers contenant les annotations @openapi
-  apis: ['./src/routes/*.ts'], 
-};
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
-// Route pour l'interface visuelle
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Interactive documentation
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
 // JSON spec: /openapi.json is the target of the ZAP scan (docker-compose-security.yml),
 // /swagger.json is read by the CI composite action.
 app.get(['/openapi.json', '/swagger.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
+  res.send(openApiDocument);
 });
 
 if (!PORT) {
