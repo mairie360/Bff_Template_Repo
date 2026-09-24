@@ -43,10 +43,15 @@ BFF User and this BFF, then `zap-api-scan.py` replays every operation of `/opena
 static admin JWT (`sub=1`, HS256, `JWT_SECRET=b"secret"` in every service) and fails on any
 WARN/FAIL alert not neutralized in `.zap/rules.tsv`.
 
+The stack never builds the BFF: it runs the image named by `IMAGE_REF`. In CI, that is the
+`dev-<sha>` image `release-dev` has just published, the same artifact that is then promoted to
+staging and prod. When `IMAGE_REF` is empty (local use), `security_test.sh` first builds
+`bff-{bff}:local` from `development.Dockerfile`, which needs `NODE_AUTH_TOKEN` and `./.npmrc`.
+
 When creating a BFF from this template:
 
-- replace `{bff}` and `{port}` in `docker-compose-security.yml` (lines marked `#change ...`) and add
-  the upstream APIs the BFF calls;
+- replace `{bff}` and `{port}` in `docker-compose-security.yml` and `security_test.sh` (lines marked
+  `#change ...`) and add the upstream APIs the BFF calls;
 - give every request field, query and path parameter of the contract a valid example, with a
   distinct example for DELETE routes, and seed the rows they name in `init-test.sql`;
 - keep the quotes around `'Bearer <jwt>'`: `zap-api-scan.py` splits `-z` with `shlex`, and an
