@@ -1,0 +1,25 @@
+# Project coverage threshold: 60 %, the same as jest.config.ts (coverageThreshold.global). Without
+# this file, Codecov applies its default `auto` target: a PR then fails as soon as it lowers the
+# coverage of `main`, even when it stays above 60 %.
+coverage:
+  status:
+    project:
+      default:
+        target: 60%
+        # No extra tolerance: 60 % already is the floor.
+        threshold: 0%
+        if_ci_failed: error
+    patch:
+      default:
+        target: 60%
+        threshold: 0%
+
+# Coverage is only measured on src/ (see collectCoverageFrom).
+ignore:
+  - "tests/**"
+  - "scripts/**"
+  - "contracts/**"
+
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: true

@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.1.0",
   "info": {
     "title": "bff_template",
     "version": "1.0.0"
@@ -18,26 +18,70 @@
       }
     },
     "schemas": {
-      "CheckApiResponse": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "CheckApisResponse": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
+            "enum": [
+              "OK",
+              "Error"
+            ],
             "example": "OK"
           },
           "core_api": {
             "type": "string",
-            "example": "Connected"
-          },
-          "calendar_api": {
-            "type": "string",
+            "enum": [
+              "Connected",
+              "Unreachable"
+            ],
             "example": "Connected"
           }
         },
         "required": [
           "status",
-          "core_api",
-          "calendar_api"
+          "core_api"
+        ]
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "example": "Anne"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Le Gall"
+          },
+          "email": {
+            "type": "string",
+            "example": "anne.le-gall@mairie360.fr"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "email"
         ]
       }
     },
@@ -50,10 +94,28 @@
         "tags": [
           "Connectivity"
         ],
-        "summary": "Vérifie la santé du BFF",
+        "summary": "Checks that the BFF is up",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -64,23 +126,91 @@
         "tags": [
           "Connectivity"
         ],
-        "summary": "Vérifie la connexion avec l'API Core et Calendar (Rust)",
+        "summary": "Checks that the upstream APIs are reachable",
         "responses": {
           "200": {
-            "description": "Connexion réussie",
+            "description": "Every upstream API is reachable",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CheckApiResponse"
+                  "$ref": "#/components/schemas/CheckApisResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "API Core injoignable"
+            "description": "At least one upstream API is unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckApisResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/example/profile": {
+      "get": {
+        "tags": [
+          "Example"
+        ],
+        "summary": "Profile of the signed-in user (Core API GET /api/v1/user/me/)",
+        "responses": {
+          "200": {
+            "description": "Profile of the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error relayed from Core API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core API is unavailable or answered an invalid body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core API is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     }
-  }
+  },
+  "webhooks": {}
 }

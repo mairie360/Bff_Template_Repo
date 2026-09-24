@@ -1,3 +1,6 @@
+# Disabled on the template itself (it would publish a bff-template package and image). In a BFF
+# created from the template: uncomment it, set the workflow name and package_name.
+
 # name: BFF Template CICD #change bff name
 
 # on:
@@ -13,7 +16,7 @@
 #   CICD:
 #     uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@v3.0.0
 #     with:
-#       package_name: bff-{} #change bff name
+#       package_name: bff-{bff} #change bff name
 #       node_version: "22"
 #       cicd_version: v3.0.0
 #       openapi_spec_path: contracts/openapi.json
