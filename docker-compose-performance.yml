@@ -1,0 +1,212 @@
+# Isolated performance test stack of the BFF.
+#
+#   ./performance_test.sh                     (local)
+#   IMAGE_REF=<image> ./performance_test.sh   (CI: the image published by release-dev)
+#
+# The BFF under test is never built by this file: it runs the image named by
+# IMAGE_REF, which the CI sets to the dev image built once by release-dev and
+# then promoted to staging and prod. When IMAGE_REF is empty, the script builds
+# bff-{bff}:local from development.Dockerfile first (NODE_AUTH_TOKEN and ./.npmrc
+# are needed to read the @mairie360/* packages).
+#
+# k6-perf-test fails when a threshold of load-test.js is exceeded.
+#
+# Template placeholders: replace {bff} with the BFF name and {port} with its port,
+# and add the upstream APIs the BFF calls (with their *-ready probe) next to core-api,
+# as in docker-compose-security.yml. Seed in init-test.sql the rows load-test.js reads.
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  backend:
+
+x-db-env: &db-env
+  DB_TYPE: postgres
+  DB_NAME: mairie_360_database
+  DB_USER: postgres
+  DB_PASSWORD: password
+  DB_HOST: postgres
+  DB_PORT: 5432
+
+services:
+  postgres:
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.3.0}
+    container_name: bff-{bff}-perf-db #change bff name
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mairie_360_database
+    expose:
+      - "5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  liquibase:
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.3.0}
+    container_name: bff-{bff}-perf-liquibase #change bff name
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/mairie_360_database
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: password
+      LIQUIBASE_SEARCH_PATH: /migrations
+    command: >
+      --changelog-file=changelog.xml
+      update
+    networks:
+      - backend
+
+  seeder:
+    image: postgres:18-alpine
+    container_name: bff-{bff}-perf-seeder #change bff name
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+    volumes:
+      - ./init-test.sql:/init-test.sql:ro
+    environment:
+      PGPASSWORD: password
+    command: >
+      sh -c "psql -h postgres -U postgres -d mairie_360_database -f /init-test.sql"
+    networks:
+      - backend
+
+  redis:
+    image: redis:8.4.0-bookworm
+    container_name: bff-{bff}-perf-redis #change bff name
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  core-api:
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:1.2.0}
+    container_name: bff-{bff}-perf-core-api #change bff name
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      PUBLIC_URL: http://core-api:3000
+      # Every service of the stack shares this secret; load-test.js signs its token with it.
+      JWT_SECRET: b"secret"
+      JWT_TIMEOUT: 3600
+    expose:
+      - "3000"
+    networks:
+      - backend
+    # The published image is distroless (no shell, no curl): its readiness is probed
+    # from the core-api-ready container below.
+
+  core-api-ready:
+    image: curlimages/curl:latest
+    container_name: bff-{bff}-perf-core-api-ready #change bff name
+    depends_on:
+      core-api:
+        condition: service_started
+    command: >
+      sh -c 'until curl -fsS http://core-api:3000/health >/dev/null; do
+      echo "waiting for core-api..."; sleep 2; done; echo "core-api ready"'
+    networks:
+      - backend
+
+  # Sessions are resolved by BFF User (GET /me): remove this service if the BFF does not call it.
+  bff-user:
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.4.0}
+    container_name: bff-{bff}-perf-bff-user #change bff name
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      core-api-ready:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core-api:3000
+    expose:
+      - "4000"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  bff-{bff}: #change bff name
+    image: ${IMAGE_REF:-bff-{bff}:local} #change bff name
+    container_name: bff-{bff}-perf-bff #change bff name
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      core-api-ready:
+        condition: service_completed_successfully
+      bff-user:
+        condition: service_healthy
+    environment:
+      HOST: "0.0.0.0"
+      PORT: {port} #change port
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core-api:3000
+      USER_BFF_URL: http://bff-user:4000
+    expose:
+      - "{port}" #change port
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{port}/health"] #change port
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  k6-perf-test:
+    image: grafana/k6:latest
+    container_name: bff-{bff}-perf-k6 #change bff name
+    depends_on:
+      bff-{bff}: #change bff name
+        condition: service_healthy
+    # load-test.js declares one handler per operation of the contract through the shared OpenAPI
+    # coverage module (mairie360/CICD tests/k6/coverage.js, cloned into cicd-repo/ by
+    # performance_test.sh or checked out by the CI job): k6 aborts at init when an operation has no
+    # handler, and fails its `operations_uncovered` threshold when a handler does not send its request.
+    volumes:
+      - ./load-test.js:/load-test.js:ro
+      # The committed contract is the coverage reference (scripts/export-swagger.ts writes it from
+      # the document the BFF serves).
+      - ./contracts/openapi.json:/openapi.json:ro
+      - ./cicd-repo/tests/k6/coverage.js:/coverage.js:ro
+    environment:
+      BASE_URL: http://bff-{bff}:{port} #change bff name #change port
+      JWT_SECRET: b"secret"
+      PERF_USER_ID: "2"
+    command: ["run", "/load-test.js"]
+    networks:
+      - backend
