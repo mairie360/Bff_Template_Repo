@@ -3,11 +3,17 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import healthRouter from './routes/health';
 import checkApis from './routes/check_apis';
+import { parseTrustProxy, securityHeaders } from './security';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const app = express();
+
+// Client IP (req.ip) used by the rate limiters: see parseTrustProxy.
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
+// Security headers on every response, /docs included.
+app.use(securityHeaders);
 
 const PORT = process.env.PORT;
 
