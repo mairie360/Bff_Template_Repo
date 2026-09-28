@@ -2,6 +2,7 @@
 
 # on:
 #   push:
+#   pull_request:
 #   workflow_dispatch:
 
 # permissions:
@@ -10,8 +11,12 @@
 
 # jobs:
 #   CICD:
-#     uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@main
+#     uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@v3.0.0
 #     with:
 #       package_name: bff-{} #change bff name
-#       node_version: 20
-#     secrets: inherit
+#       node_version: "22"
+#       cicd_version: v3.0.0
+#       openapi_spec_path: contracts/openapi.json
+#     secrets:
+#       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+#       N8N_WEBHOOK_SECRET: ${{ secrets.N8N_WEBHOOK_SECRET }}

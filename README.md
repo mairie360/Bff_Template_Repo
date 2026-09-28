@@ -48,10 +48,20 @@ The stack never builds the BFF: it runs the image named by `IMAGE_REF`. In CI, t
 staging and prod. When `IMAGE_REF` is empty (local use), `security_test.sh` first builds
 `bff-{bff}:local` from `development.Dockerfile`, which needs `NODE_AUTH_TOKEN` and `./.npmrc`.
 
+The stack also runs the OpenAPI coverage hook of `mairie360/CICD` (`tests/zap/zap_hooks.py`),
+checked out as `cicd-repo/` by the CI jobs and cloned there by `security_test.sh` at the
+`cicd_version` pinned in `.github/workflows/cicd.yml` (`CICD_VERSION` overrides it). After the
+scan, it fails when an operation of the spec was never reached, or when an operation that requires
+`bearerAuth` only got 401/403. The spec (`src/openapi.ts`) requires `bearerAuth` at the top level;
+public operations (`/health`, `/check_apis`) declare `security: []` in their `registerPath`, so a
+new route is authenticated by default.
+
 When creating a BFF from this template:
 
 - replace `{bff}` and `{port}` in `docker-compose-security.yml` and `security_test.sh` (lines marked
   `#change ...`) and add the upstream APIs the BFF calls;
+- set `package_name` in `.github/workflows/cicd.yml`, uncomment it, and name the spec in
+  `src/openapi.ts`; import every new route module in `src/openapi.ts`;
 - give every request field, query and path parameter of the contract a valid example, with a
   distinct example for DELETE routes, and seed the rows they name in `init-test.sql`;
 - keep the quotes around `'Bearer <jwt>'`: `zap-api-scan.py` splits `-z` with `shlex`, and an
