@@ -35,8 +35,9 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Route pour l'interface visuelle
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Route pour l'extraction JSON (utilisée par l'Action Composite)
-app.get('/swagger.json', (req, res) => {
+// JSON spec: /openapi.json is the target of the ZAP scan (docker-compose-security.yml),
+// /swagger.json is read by the CI composite action.
+app.get(['/openapi.json', '/swagger.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });

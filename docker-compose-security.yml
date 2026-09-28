@@ -1,0 +1,232 @@
+# Isolated dynamic security test stack (DAST) of the BFF.
+#
+#   ./security_test.sh            (local)
+#   docker compose -f docker-compose-security.yml up --build \
+#       --abort-on-container-exit --exit-code-from security-scan   (CI)
+#
+# security-scan (OWASP ZAP) imports /openapi.json, replays every operation with a
+# valid admin JWT (replacer) and fails on any WARN/FAIL alert not neutralized in
+# .zap/rules.tsv (informational alerts are set to IGNORE there).
+# NODE_AUTH_TOKEN must be exported for the local build (read access to @mairie360/*).
+#
+# Template placeholders: replace {bff} with the BFF name and {port} with its port,
+# and add the upstream APIs the BFF calls (with their *-ready probe) next to core-api.
+# To reach every operation, give each request field, query and path parameter of the
+# contract a valid example, and seed in init-test.sql the rows those examples name.
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  backend:
+
+secrets:
+  npmrc:
+    file: ./.npmrc
+  node_auth_token:
+    environment: NODE_AUTH_TOKEN
+
+x-db-env: &db-env
+  DB_TYPE: postgres
+  DB_NAME: mairie_360_database
+  DB_USER: postgres
+  DB_PASSWORD: password
+  DB_HOST: postgres
+  DB_PORT: 5432
+
+services:
+  postgres:
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.3.0}
+    container_name: bff-{bff}-sec-db #change bff name
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mairie_360_database
+    expose:
+      - "5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  liquibase:
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.3.0}
+    container_name: bff-{bff}-sec-liquibase #change bff name
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/mairie_360_database
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: password
+      LIQUIBASE_SEARCH_PATH: /migrations
+    command: >
+      --changelog-file=changelog.xml
+      update
+    networks:
+      - backend
+
+  seeder:
+    image: postgres:18-alpine
+    container_name: bff-{bff}-sec-seeder #change bff name
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+    volumes:
+      - ./init-test.sql:/init-test.sql:ro
+    environment:
+      PGPASSWORD: password
+    command: >
+      sh -c "psql -h postgres -U postgres -d mairie_360_database -f /init-test.sql"
+    networks:
+      - backend
+
+  redis:
+    image: redis:8.4.0-bookworm
+    container_name: bff-{bff}-sec-redis #change bff name
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  core-api:
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:1.2.0}
+    container_name: bff-{bff}-sec-core-api #change bff name
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      PUBLIC_URL: http://core-api:3000
+      # Every service of the stack shares this secret; the ZAP token below is signed with it.
+      JWT_SECRET: b"secret"
+      JWT_TIMEOUT: 3600
+    expose:
+      - "3000"
+    networks:
+      - backend
+    # The published image is distroless (no shell, no curl): its readiness is probed
+    # from the core-api-ready container below.
+
+  core-api-ready:
+    image: curlimages/curl:latest
+    container_name: bff-{bff}-sec-core-api-ready #change bff name
+    depends_on:
+      core-api:
+        condition: service_started
+    command: >
+      sh -c 'until curl -fsS http://core-api:3000/health >/dev/null; do
+      echo "waiting for core-api..."; sleep 2; done; echo "core-api ready"'
+    networks:
+      - backend
+
+  # Sessions are resolved by BFF User (GET /me): remove this service if the BFF does not call it.
+  bff-user:
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.4.0}
+    container_name: bff-{bff}-sec-bff-user #change bff name
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      core-api-ready:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core-api:3000
+    expose:
+      - "4000"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  bff-{bff}: #change bff name
+    image: ${TARGET_IMAGE:-bff-{bff}:security} #change bff name
+    container_name: bff-{bff}-sec-bff #change bff name
+    build:
+      context: .
+      dockerfile: development.Dockerfile
+      secrets:
+        - npmrc
+        - node_auth_token
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      core-api-ready:
+        condition: service_completed_successfully
+      bff-user:
+        condition: service_healthy
+    environment:
+      HOST: "0.0.0.0"
+      PORT: {port} #change port
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core-api:3000
+      USER_BFF_URL: http://bff-user:4000
+    expose:
+      - "{port}" #change port
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{port}/health"] #change port
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  security-scan:
+    image: zaproxy/zap-stable
+    container_name: bff-{bff}-sec-zap #change bff name
+    depends_on:
+      bff-{bff}: #change bff name
+        condition: service_healthy
+    volumes:
+      - ./.zap/rules.tsv:/zap/wrk/rules.tsv:ro
+    # -c rules.tsv: informational alerts are set to IGNORE, any other alert
+    #   (WARN/FAIL) makes zap-api-scan.py exit non-zero.
+    # -z ... replacer: injects a static HS256 JWT (sub=1, the Admin user seeded by
+    #   init-test.sql, exp=2100, signed with JWT_SECRET=b"secret") on every request,
+    #   so every operation is scanned as an authenticated admin.
+    # -silent: no check-for-update or telemetry when the ZAP daemon starts (otherwise
+    #   it can hang on add-on updates and fail with "Failed to connect to ZAP").
+    # -z is split with shlex: 'Bearer <jwt>' must stay quoted, otherwise ZAP only
+    #   receives "replacement=Bearer" and every authenticated route answers 401.
+    # formhandler: ZAP ignores the contract example of a field named "password" and sends
+    #   "ZAP", below the 8-character minimum. Defining one field replaces ZAP's whole
+    #   default list, so every other field takes its example from the contract.
+    command:
+      - zap-api-scan.py
+      - -t
+      - http://bff-{bff}:{port}/openapi.json #change bff name #change port
+      - -f
+      - openapi
+      - -c
+      - rules.tsv
+      - -z
+      - "-silent -config formhandler.fields.field(0).fieldId=password -config formhandler.fields.field(0).value=Zap-Scan-Passw0rd -config formhandler.fields.field(0).enabled=true -config replacer.full_list(0).description=auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Authorization -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement='Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo0MTAyNDQ0ODAwfQ.xCeBe_2QxRlXW8WXr3t6F69wbEHA93HbP_7l4OTJwjA'"
+    networks:
+      - backend
