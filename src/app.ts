@@ -1,13 +1,19 @@
 import 'dotenv/config';
+import { errorHandler, notFoundHandler } from '@mairie360/bffs-lib';
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './openapi';
 import healthRouter from './routes/health';
 import checkApis from './routes/check_apis';
 import exampleRouter from './routes/example';
+import { parseTrustProxy, securityHeaders } from './security';
 
 export const app = express();
 app.disable('x-powered-by');
+// Client IP (req.ip) used by the rate limiters: see parseTrustProxy.
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
+// Security headers on every response, /docs included; the stricter API-only headers below override them.
+app.use(securityHeaders);
 
 // API-only surface: no embedded content, so a hard default-src covers every route below.
 // Runs first (before body parsing) so it also covers body-parse error responses; /docs opts out.
@@ -33,11 +39,10 @@ app.use('/check_apis', checkApis);
 // Session-bound answers must never be cached by a proxy or the browser.
 app.use('/example', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); }, exampleRouter);
 
-// JSON 404 and 400 (unparsable body) instead of Express' HTML pages.
-app.use((_req, res) => res.status(404).json({ error: { message: 'Unknown route.' } }));
-app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (res.headersSent) return next(err);
-  return res.status(400).json({ error: { message: 'Invalid request body.' } });
-});
+// Unknown routes and every error end in the shared envelope `{ error: { code, message, details } }`:
+// the status of the error is kept (400 for an unparsable body, 401, 404, 502, 503...) and anything
+// unexpected becomes a 500 without leaking its message.
+app.use(notFoundHandler);
+app.use(errorHandler());
 
 export default app;

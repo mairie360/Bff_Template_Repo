@@ -1,3 +1,4 @@
+import { buildErrorResponse } from '@mairie360/bffs-lib';
 import type { Request, RequestHandler } from 'express';
 import helmet from 'helmet';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
@@ -55,7 +56,7 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 /**
  * Rate limiter to put in front of sensitive routes (sign-in, one-time tokens, password reset):
  * `router.post('/login', createRateLimiter({ keyOf: (req) => req.body?.email ?? '' }), handler)`.
- * Answers 429 `{ error: { message } }` with `Retry-After`. Counters live in memory, per replica.
+ * Answers 429 in the shared error envelope with `Retry-After`. Counters live in memory, per replica.
  */
 export function createRateLimiter(options: RateLimiterOptions = {}): RequestHandler {
   const enabled = options.enabled ?? process.env.RATE_LIMIT_ENABLED?.trim().toLowerCase() !== 'false';
@@ -72,6 +73,6 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RequestHand
       const ip = ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? 'unknown');
       return keyOf ? `${ip}|${keyOf(req).trim().toLowerCase()}` : ip;
     },
-    message: { error: { message: RATE_LIMIT_MESSAGE } },
+    message: buildErrorResponse('TOO_MANY_REQUESTS', RATE_LIMIT_MESSAGE),
   });
 }

@@ -1,8 +1,9 @@
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
+import { HttpError, mapUpstreamError } from '@mairie360/bffs-lib';
 import axios, { type AxiosRequestConfig } from 'axios';
 import type { Request } from 'express';
 import { ZodError } from 'zod';
-import { authorization, baseUrl, UpstreamError } from './upstream';
+import { authorization, baseUrl } from './upstream';
 
 // Core API is only called through the operations of its published contract (@mairie360/core-api-openapi).
 // Wrap every other upstream API the same way, from its own @mairie360/<name>-api-openapi package.
@@ -26,17 +27,12 @@ export function withoutSession(timeout = 5_000): AxiosRequestConfig {
 }
 
 /**
- * An upstream 4xx is kept, an upstream failure (5xx) becomes a 502 without relaying its body, a
- * network failure a 502 "unavailable", and an unusable answer (invalid JSON, missing fields) a 502
- * "invalid answer".
+ * Error to throw for a failed Core call. Only the upstream 4xx the route declares in its contract
+ * (`declared`) are kept; any other status, a network failure and an unusable answer (invalid JSON,
+ * missing fields) become a 502. The upstream body is never relayed.
  */
-export function coreError(error: unknown): unknown {
-  if (error instanceof UpstreamError) return error;
-  if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    if (status === undefined) return new UpstreamError(502, 'The CORE_API service is unavailable.');
-    return new UpstreamError(status >= 500 ? 502 : status, `The CORE_API service answered ${status}.`);
-  }
-  if (error instanceof ZodError) return new UpstreamError(502, 'The CORE_API answer is invalid.');
-  return error;
+export function coreError(error: unknown, declared: readonly number[] = []): HttpError {
+  if (axios.isAxiosError(error) && error.response === undefined) return new HttpError(502, 'The CORE_API service is unavailable.');
+  if (error instanceof ZodError) return new HttpError(502, 'The CORE_API answer is invalid.');
+  return mapUpstreamError(error, declared);
 }

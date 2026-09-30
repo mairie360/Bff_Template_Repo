@@ -78,18 +78,31 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
 
     expect(response.status).toBe(401);
     expectBffContract('get', '/example/profile', response);
-    expect(response.body).toEqual({ error: { message: 'Invalid session.' } });
+    expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Invalid session.', details: [] } });
     expect(coreApi.requests).toHaveLength(0);
   });
 
-  test.each([401, 404])('keeps a Core %i', async (status) => {
+  test.each([
+    [401, 'UNAUTHORIZED', 'Authentication required'],
+    [404, 'NOT_FOUND', 'Resource not found'],
+  ])('keeps a declared Core %i with a generic message', async (status, code, message) => {
     coreApi.on('get', CORE.me, coreError(status, 'Unauthorized'));
 
     const response = await profile(bearer());
 
     expect(response.status).toBe(status);
     expectBffContract('get', '/example/profile', response);
-    expect(response.body).toEqual({ error: { message: `The CORE_API service answered ${status}.` } });
+    expect(response.body).toEqual({ error: { code, message, details: [] } });
+  });
+
+  test.each([403, 409, 422])('turns an undeclared Core %i into a 502', async (status) => {
+    coreApi.on('get', CORE.me, coreError(status, 'Forbidden'));
+
+    const response = await profile(bearer());
+
+    expect(response.status).toBe(502);
+    expectBffContract('get', '/example/profile', response);
+    expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'Upstream service error', details: [] } });
   });
 
   test('turns a Core 500 into a 502 without relaying its body', async () => {
@@ -109,7 +122,7 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
 
     expect(response.status).toBe(502);
     expectBffContract('get', '/example/profile', response);
-    expect(response.body).toEqual({ error: { message: 'The CORE_API answer is invalid.' } });
+    expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'The CORE_API answer is invalid.', details: [] } });
   });
 
   test('answers 502 when Core API is unreachable', async () => {
@@ -119,7 +132,7 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
 
     expect(response.status).toBe(502);
     expectBffContract('get', '/example/profile', response);
-    expect(response.body).toEqual({ error: { message: 'The CORE_API service is unavailable.' } });
+    expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'The CORE_API service is unavailable.', details: [] } });
   });
 
   test('answers 503 when Core API is not configured', async () => {
@@ -129,7 +142,7 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
 
     expect(response.status).toBe(503);
     expectBffContract('get', '/example/profile', response);
-    expect(response.body).toEqual({ error: { message: 'The CORE_API service is not configured.' } });
+    expect(response.body).toEqual({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The CORE_API service is not configured.', details: [] } });
   });
 });
 
