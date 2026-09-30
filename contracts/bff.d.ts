@@ -120,7 +120,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description Error relayed from Core API */
@@ -129,16 +129,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core API is unavailable or answered an invalid body */
+                /** @description Core API is unavailable, failed or answered an invalid body */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description Core API is not configured */
@@ -147,7 +147,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -164,9 +164,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Error: {
+        ErrorResponse: {
             error: {
+                /** @enum {string} */
+                code: "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNPROCESSABLE_ENTITY" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "BAD_GATEWAY" | "SERVICE_UNAVAILABLE" | "GATEWAY_TIMEOUT";
                 message: string;
+                details: {
+                    path?: string;
+                    message: string;
+                }[];
             };
         };
         CheckApisResponse: {

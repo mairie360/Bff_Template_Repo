@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { ErrorSchema, registry } from '../openapi-registry';
 import { asCaller, coreApi, coreError } from '../clients/coreClient';
-import { routeError } from '../clients/upstream';
 
 // Example of an authenticated route: it forwards the caller's session to Core API through the
 // generated client and only exposes the fields its own contract declares. Replace it with the
@@ -17,7 +16,7 @@ export const ProfileSchema = registry.register('Profile', z.object({
 }));
 
 const errors = (...statuses: number[]) => Object.fromEntries(statuses.map((status) => [status, {
-  description: { 401: 'Missing or invalid session', 502: 'Core API is unavailable or answered an invalid body', 503: 'Core API is not configured' }[status] ?? 'Error relayed from Core API',
+  description: { 401: 'Missing or invalid session', 502: 'Core API is unavailable, failed or answered an invalid body', 503: 'Core API is not configured' }[status] ?? 'Error relayed from Core API',
   content: { 'application/json': { schema: ErrorSchema } },
 }]));
 
@@ -38,7 +37,9 @@ router.get('/profile', async (req, res) => {
     // parse() drops the Core fields the contract does not expose (groups, role, status, phone).
     res.json(ProfileSchema.parse(data));
   } catch (error) {
-    routeError(res, coreError(error));
+    // Express 5 hands the rejection to errorHandler() (app.ts). Only the Core 4xx declared above are
+    // kept: anything else Core answers becomes a 502.
+    throw coreError(error, [401, 404]);
   }
 });
 

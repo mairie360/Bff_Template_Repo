@@ -88,15 +88,27 @@ family (50 ms for `/health`, 150 ms for `/check_apis`, 400 ms for reads, 800 ms 
 `contracts/openapi.json` is the reference of both gates: regenerate it with
 `npm run contracts:generate` after any route or schema change.
 
-## Creating a BFF from this template
-
-# Lancer le conteneur
-docker run -p 3000:3000 --env-file .env bff-template
 ## Security building blocks (`src/security.ts`)
 
-- `securityHeaders`: `helmet` with the same configuration as BFF User (CSP without `upgrade-insecure-requests`, `X-Content-Type-Options`, CORP, no `X-Powered-By`), mounted first in `src/index.ts`.
+- `securityHeaders`: `helmet` with the same configuration as BFF User (CSP without `upgrade-insecure-requests`, `X-Content-Type-Options`, CORP, no `X-Powered-By`), mounted first in `src/app.ts`.
 - `createRateLimiter(options)`: `express-rate-limit` to put in front of sensitive routes (sign-in, one-time tokens, password reset). Counts failed requests only by default and answers 429 with `Retry-After`. Environment: `RATE_LIMIT_ENABLED` (`false` disables it), `RATE_LIMIT_WINDOW_MS` (default 900000), `RATE_LIMIT_MAX` (default 10).
 - `TRUST_PROXY`: Express `trust proxy` (hop count, `true`, or trusted subnets). Set it behind the ingress so that `req.ip`, and therefore the rate limits, is the real client and not the proxy.
+
+## Errors (`@mairie360/bffs-lib`)
+
+Every error is answered in the envelope shared by all the BFFs, `{ error: { code, message, details } }`,
+registered once as the `ErrorResponse` schema (`src/openapi-registry.ts`) and referenced by every error
+response of the contract:
+
+- routes throw `HttpError(status, message?)` (Express 5 forwards async rejections); `notFoundHandler`
+  and `errorHandler()` close `src/app.ts`, keep the status and turn anything unexpected into a generic 500;
+- a failed upstream call is thrown through `coreError(error, declared)`: only the upstream 4xx listed in
+  `declared` (the statuses the route's contract declares) are kept, anything else becomes a 502, and the
+  upstream body is never relayed;
+- the rate limiter answers its 429 in the same envelope.
+
+## Creating a BFF from this template
+
 - replace `{bff}` and `{port}` on the lines marked `#change ...` (`docker-compose*.yml`,
   `security_test.sh`, `performance_test.sh`, `.github/workflows/cicd.yml`) and the default port in
   `src/index.ts`, `Dockerfile` and `.env.example`; name the package in `package.json` and the spec

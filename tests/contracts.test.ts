@@ -38,12 +38,15 @@ test('the example profile rejects a missing session before contacting upstream s
 test('unknown routes and unparsable bodies answer JSON with the security headers', async () => {
   const unknown = await request(app).get('/unknown');
   expect(unknown.status).toBe(404);
-  expect(unknown.body).toEqual({ error: { message: 'Unknown route.' } });
+  expect(unknown.body).toEqual({ error: { code: 'NOT_FOUND', message: 'Route not found', details: [] } });
   expect(unknown.headers['content-security-policy']).toBe("default-src 'none'");
   expect(unknown.headers['x-content-type-options']).toBe('nosniff');
   expect(unknown.headers['x-powered-by']).toBeUndefined();
+  // helmet (src/security.ts) is mounted first: its headers are on every answer.
+  expect(unknown.headers['strict-transport-security']).toBeDefined();
+  expect(unknown.headers['cross-origin-opener-policy']).toBe('same-origin');
 
   const invalid = await request(app).post('/example/profile').set('Content-Type', 'application/json').send('{"broken"');
   expect(invalid.status).toBe(400);
-  expect(invalid.body).toEqual({ error: { message: 'Invalid request body.' } });
+  expect(invalid.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Invalid request', details: [] } });
 });

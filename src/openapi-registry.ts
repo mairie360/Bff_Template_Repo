@@ -1,4 +1,5 @@
 import { OpenAPIRegistry, extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { ErrorResponseSchema } from '@mairie360/bffs-lib';
 import { z } from 'zod';
 
 // Adds the .openapi() methods to Zod.
@@ -16,5 +17,7 @@ export const bearerAuth = registry.registerComponent('securitySchemes', 'bearerA
   bearerFormat: 'JWT',
 });
 
-// Body of every error answer (`routeError()` in clients/upstream.ts, 404 and 400 in app.ts).
-export const ErrorSchema = registry.register('Error', z.object({ error: z.object({ message: z.string() }) }));
+// Body of every error answer, shared by every BFF (`@mairie360/bffs-lib`): `{ error: { code, message, details } }`.
+// clone(): the lib builds its schemas on import, before extendZodWithOpenApi() above, and zod 4 only
+// adds .openapi() to schemas created after the extension.
+export const ErrorSchema = registry.register('ErrorResponse', ErrorResponseSchema.clone());

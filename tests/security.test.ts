@@ -39,7 +39,7 @@ describe('createRateLimiter', () => {
     const blocked = await request(app).post('/login').send({ email: 'a@x.fr', password: 'good' });
 
     expect(blocked.status).toBe(429);
-    expect(blocked.body).toEqual({ error: { message: RATE_LIMIT_MESSAGE } });
+    expect(blocked.body).toEqual({ error: { code: 'TOO_MANY_REQUESTS', message: RATE_LIMIT_MESSAGE, details: [] } });
     expect(blocked.headers['retry-after']).toBeDefined();
     expect((await request(app).post('/login').send({ email: 'b@x.fr' })).status).toBe(401);
   });
