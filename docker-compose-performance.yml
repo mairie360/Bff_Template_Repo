@@ -135,7 +135,7 @@ services:
 
   # Sessions are resolved by BFF User (GET /me): remove this service if the BFF does not call it.
   bff-user:
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.4.0}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.5.0}
     container_name: bff-{bff}-perf-bff-user #change bff name
     depends_on:
       seeder:
