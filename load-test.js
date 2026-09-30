@@ -46,6 +46,10 @@ const handlers = {
   'GET /check_apis': ({ request }) =>
     check(request(), { 'check_apis 200': (r) => r.status === 200 }),
 
+  // --- Example route (src/routes/example.ts): replace it with the BFF's routes ---
+  'GET /example/profile': ({ request }) =>
+    check(request(), { 'profile 200': (r) => r.status === 200 }),
+
   // --- Add one handler per operation of the BFF, for example: ---
   // 'GET /items/{itemId}': ({ request }) =>
   //   check(request({ path: { itemId: 1 } }), { 'item 200': (r) => r.status === 200 }),
