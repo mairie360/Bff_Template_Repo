@@ -4,21 +4,23 @@ const globals = require('globals');
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
 module.exports = [
-  // 🔸 Ignorer les fichiers qui ne doivent pas être parsés
+  // Files that must not be parsed.
   {
     ignores: [
       'dist/',
       'node_modules/',
       'coverage/',
+      'cicd-repo/',
       'eslint.config.cjs',
-      '.eslintrc.js',
       'jest.config.ts',
+      'scripts/export-swagger.ts',
+      'load-test.js',
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.ts'], // ✅ On limite ESLint aux fichiers sources TypeScript
+    files: ['src/**/*.ts'], // Type-aware rules on the TypeScript sources only.
     languageOptions: {
       globals: {
         ...globals.node,

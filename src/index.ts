@@ -51,10 +51,3 @@ if (!PORT) {
   console.error('Error: PORT environment variable is not set.');
   process.exit(1);
 }
-
-app.use('/health', healthRouter);
-app.use('/check_apis', checkApis);
-
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});

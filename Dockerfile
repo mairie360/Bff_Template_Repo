@@ -1,26 +1,35 @@
-# --- Étape 1 : Build ---
-FROM node:20-alpine AS builder
+# --- Stage 1: build ---
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+
+# The GitHub Packages credentials are only available during npm ci.
+RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
+    --mount=type=secret,id=node_auth_token,env=NODE_AUTH_TOKEN \
+    npm ci
+
 COPY . .
 RUN npm run build
-# On ne garde que les dépendances de prod pour le runtime
-RUN npm ci --omit=dev --ignore-scripts
 
-# --- Étape 2 : Runtime ---
-FROM node:20-alpine
+# Keep only the production dependencies for the runtime.
+RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
+    --mount=type=secret,id=node_auth_token,env=NODE_AUTH_TOKEN \
+    npm ci --omit=dev --ignore-scripts
+
+# --- Stage 2: runtime ---
+FROM node:24-alpine
 ENV NODE_ENV=production
 RUN apk add --no-cache curl
 
 WORKDIR /app
+# Files stay owned by root: the node user cannot modify the code it runs.
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 
 USER node
 
-# OPTIMISATION : On bride la heap à 180Mo pour tenir dans un limit K8s de 256Mo
+# Cap the heap at 180 MB to fit a 256 MB Kubernetes memory limit.
 ENV NODE_OPTIONS="--max-old-space-size=180"
 
 #change port
