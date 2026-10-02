@@ -1,25 +1,26 @@
-# Disabled on the template itself (it would publish a bff-template package and image). In a BFF
-# created from the template: uncomment it, set the workflow name and package_name.
+# Same pipeline as every BFF. Running it on the template publishes a bff-template image and
+# @mairie360/bff-template-openapi package, so the template is linted, tested, scanned (ZAP, k6) and
+# released exactly like the BFFs generated from it. In a new BFF: set the workflow name and
+# package_name (lines marked #change bff name).
+name: BFF Template CICD #change bff name
 
-# name: BFF Template CICD #change bff name
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
-# on:
-#   push:
-#   pull_request:
-#   workflow_dispatch:
+permissions:
+  contents: write
+  packages: write
 
-# permissions:
-#   contents: write
-#   packages: write
-
-# jobs:
-#   CICD:
-#     uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@v3.0.0
-#     with:
-#       package_name: bff-{bff} #change bff name
-#       node_version: "22"
-#       cicd_version: v3.0.0
-#       openapi_spec_path: contracts/openapi.json
-#     secrets:
-#       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-#       N8N_WEBHOOK_SECRET: ${{ secrets.N8N_WEBHOOK_SECRET }}
+jobs:
+  CICD:
+    uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@v3.1.2
+    with:
+      package_name: bff-template #change bff name
+      node_version: "22"
+      cicd_version: v3.1.2
+      openapi_spec_path: contracts/openapi.json
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      N8N_WEBHOOK_SECRET: ${{ secrets.N8N_WEBHOOK_SECRET }}

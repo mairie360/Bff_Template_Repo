@@ -20,8 +20,5 @@ jobs:
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # The template keeps cicd.yml disabled: lint and build run here so it keeps compiling.
-      - run: npm run lint
-      - run: npm run build
       - run: npm run contracts:check
       - run: npm test -- --runInBand
