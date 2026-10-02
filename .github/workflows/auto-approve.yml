@@ -4,12 +4,12 @@ on: pull_request_target
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
+    # Approve only when Renovate itself triggered the event: a push by anyone else on a Renovate
+    # branch is not auto-approved.
+    if: github.actor == 'renovate[bot]'
+    # Least privilege: approving a PR only needs pull-requests: write.
     permissions:
       pull-requests: write
-      contents: write
-    # Match the PR author, not the event actor, so a Renovate PR is still approved
-    # after a maintainer pushes a fix or updates the branch.
-    if: github.event.pull_request.user.login == 'renovate[bot]'
     steps:
       - uses: hmarr/auto-approve-action@v4
         with:

@@ -46,10 +46,15 @@ docker build --secret id=npmrc,src=.npmrc --secret id=node_auth_token,env=NODE_A
 
 ## CI
 
-`.github/workflows/contracts.yml` runs lint, build, `contracts:check` and the tests on every push.
-`.github/workflows/cicd.yml` (the reusable `mairie360/CICD` `BFFs-cicd.yml` workflow: release,
-image, ZAP and k6 stacks) is commented out on the template, which must not publish a package or an
-image: uncomment it in the BFF created from it.
+Same workflows as every BFF:
+
+- `.github/workflows/cicd.yml` calls the reusable `mairie360/CICD` `BFFs-cicd.yml` workflow (lint,
+  build, tests, Semgrep, then on `main` the `dev-<sha>` image, the ZAP and k6 stacks, the staging and
+  prod releases). It is pinned to the same `cicd_version` as the BFFs, and Renovate keeps the `uses:`
+  tag and `cicd_version` aligned. The template runs it too, so its skeleton is scanned and load-tested
+  like a real BFF: it publishes a `bff-template` image and `@mairie360/bff-template-openapi` package.
+- `.github/workflows/contracts.yml` runs `contracts:check` and the tests on every push.
+- `.github/workflows/auto-approve.yml` approves Renovate PRs (only `pull-requests: write`).
 
 ## Security test stack (OWASP ZAP)
 
@@ -62,7 +67,7 @@ WARN/FAIL alert not neutralized in `.zap/rules.tsv`.
 The stack never builds the BFF: it runs the image named by `IMAGE_REF`. In CI, that is the
 `dev-<sha>` image `release-dev` has just published, the same artifact that is then promoted to
 staging and prod. When `IMAGE_REF` is empty (local use), `security_test.sh` first builds
-`bff-{bff}:local` from `development.Dockerfile`, which needs `NODE_AUTH_TOKEN` and `./.npmrc`.
+`bff-template:local` from `development.Dockerfile`, which needs `NODE_AUTH_TOKEN` and `./.npmrc`.
 
 The stack also runs the OpenAPI coverage hook of `mairie360/CICD` (`tests/zap/zap_hooks.py`),
 checked out as `cicd-repo/` by the CI jobs and cloned there by `security_test.sh` at the
@@ -90,6 +95,9 @@ family (50 ms for `/health`, 150 ms for `/check_apis`, 400 ms for reads, 800 ms 
 
 ## Security building blocks (`src/security.ts`)
 
+These helpers are meant to move to `@mairie360/bffs-lib`, which does not export them yet; until then,
+a BFF that needs them copies `src/security.ts`.
+
 - `securityHeaders`: `helmet` with the same configuration as BFF User (CSP without `upgrade-insecure-requests`, `X-Content-Type-Options`, CORP, no `X-Powered-By`), mounted first in `src/app.ts`.
 - `createRateLimiter(options)`: `express-rate-limit` to put in front of sensitive routes (sign-in, one-time tokens, password reset). Counts failed requests only by default and answers 429 with `Retry-After`. Environment: `RATE_LIMIT_ENABLED` (`false` disables it), `RATE_LIMIT_WINDOW_MS` (default 900000), `RATE_LIMIT_MAX` (default 10).
 - `TRUST_PROXY`: Express `trust proxy` (hop count, `true`, or trusted subnets). Set it behind the ingress so that `req.ip`, and therefore the rate limits, is the real client and not the proxy.
@@ -109,11 +117,10 @@ response of the contract:
 
 ## Creating a BFF from this template
 
-- replace `{bff}` and `{port}` on the lines marked `#change ...` (`docker-compose*.yml`,
-  `security_test.sh`, `performance_test.sh`, `.github/workflows/cicd.yml`) and the default port in
-  `src/index.ts`, `Dockerfile` and `.env.example`; name the package in `package.json` and the spec
-  in `src/openapi.ts`;
-- uncomment `.github/workflows/cicd.yml` and set its `package_name`;
+- on the lines marked `#change ...`, replace the name `template` and the port `4000`
+  (`docker-compose*.yml`, `security_test.sh`, `performance_test.sh`, `.github/workflows/cicd.yml`:
+  workflow name and `package_name`) and the default port in `src/index.ts`, `Dockerfile` and
+  `.env.example`; name the package in `package.json` and the spec in `src/openapi.ts`;
 - replace `src/routes/example.ts` with the BFF's routes (import every route module in
   `src/openapi.ts`), add the upstream API clients it needs in `src/clients/` and their probe in
   `src/routes/check_apis.ts`, then run `npm run contracts:generate`;
