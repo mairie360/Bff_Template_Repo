@@ -1,9 +1,9 @@
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
-import { HttpError, mapUpstreamError } from '@mairie360/bffs-lib';
+import { HttpError, authorization, mapUpstreamError } from '@mairie360/bffs-lib';
 import axios, { type AxiosRequestConfig } from 'axios';
 import type { Request } from 'express';
 import { ZodError } from 'zod';
-import { authorization, baseUrl } from './upstream';
+import { baseUrl } from './upstream';
 
 // Core API is only called through the operations of its published contract (@mairie360/core-api-openapi).
 // Wrap every other upstream API the same way, from its own @mairie360/<name>-api-openapi package.

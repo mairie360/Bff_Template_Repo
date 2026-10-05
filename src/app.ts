@@ -1,12 +1,12 @@
 import 'dotenv/config';
-import { errorHandler, notFoundHandler } from '@mairie360/bffs-lib';
+import { errorHandler, noStore, notFoundHandler, parseTrustProxy, requireBearer } from '@mairie360/bffs-lib';
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './openapi';
 import healthRouter from './routes/health';
 import checkApis from './routes/check_apis';
 import exampleRouter from './routes/example';
-import { parseTrustProxy, securityHeaders } from './security';
+import { securityHeaders } from './security';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -36,8 +36,9 @@ app.get(['/openapi.json', '/swagger.json'], (_req, res) => res.json(openApiDocum
 
 app.use('/health', healthRouter);
 app.use('/check_apis', checkApis);
-// Session-bound answers must never be cached by a proxy or the browser.
-app.use('/example', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); }, exampleRouter);
+// Session-bound routers: never cached by a proxy or the browser (noStore), and a 401 before any
+// upstream call when the request has no `Authorization: Bearer <token>` (requireBearer).
+app.use('/example', noStore, requireBearer, exampleRouter);
 
 // Unknown routes and every error end in the shared envelope `{ error: { code, message, details } }`:
 // the status of the error is kept (400 for an unparsable body, 401, 404, 502, 503...) and anything
