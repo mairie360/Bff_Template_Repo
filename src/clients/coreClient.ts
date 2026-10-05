@@ -1,12 +1,13 @@
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
-import { HttpError, authorization, mapUpstreamError } from '@mairie360/bffs-lib';
+import { HttpError, authorization, baseUrl, mapUpstreamError } from '@mairie360/bffs-lib';
 import axios, { type AxiosRequestConfig } from 'axios';
 import type { Request } from 'express';
 import { ZodError } from 'zod';
-import { baseUrl } from './upstream';
 
 // Core API is only called through the operations of its published contract (@mairie360/core-api-openapi).
 // Wrap every other upstream API the same way, from its own @mairie360/<name>-api-openapi package.
+// No baseURL here: it is read from CORE_API_URL / CORE_API_PORT on every call (lib `baseUrl`), with no
+// localhost default; the instance only holds the timeout and headers.
 const coreAxios = axios.create({ timeout: 10_000, headers: { Accept: 'application/json' } });
 
 export const coreApi = getCoreAPIMairie360(coreAxios);

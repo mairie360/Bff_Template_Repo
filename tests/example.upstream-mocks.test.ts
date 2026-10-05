@@ -1,3 +1,4 @@
+import axios from 'axios';
 import path from 'node:path';
 import request from 'supertest';
 import app from '../src/app';
@@ -166,6 +167,15 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
     expectBffContract('get', '/example/profile', response);
     expect(response.body).toEqual({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The CORE_API service is not configured.', details: [] } });
   });
+
+  test('checks the session before the configuration: 401 without one, even when Core API is not configured', async () => {
+    delete process.env.CORE_API_URL;
+
+    const response = await profile();
+
+    expect(response.status).toBe(401);
+    expectBffContract('get', '/example/profile', response);
+  });
 });
 
 describe('GET /check_apis', () => {
@@ -188,5 +198,21 @@ describe('GET /check_apis', () => {
     expect(response.status).toBe(502);
     expectBffContract('get', '/check_apis', response);
     expect(response.body).toEqual({ status: 'Error', core_api: 'Unreachable' });
+  });
+
+  test('reports Core API unreachable without calling any default host when it is not configured', async () => {
+    delete process.env.CORE_API_URL;
+    const requestSpy = jest.spyOn(axios.Axios.prototype, 'request');
+
+    try {
+      const response = await request(app).get('/check_apis');
+
+      expect(response.status).toBe(502);
+      expectBffContract('get', '/check_apis', response);
+      expect(response.body).toEqual({ status: 'Error', core_api: 'Unreachable' });
+      expect(requestSpy).not.toHaveBeenCalled();
+    } finally {
+      requestSpy.mockRestore();
+    }
   });
 });
