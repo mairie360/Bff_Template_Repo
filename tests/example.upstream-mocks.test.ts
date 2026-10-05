@@ -138,6 +138,28 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
     expect(JSON.stringify(response.body)).not.toContain('database');
   });
 
+  test('retries the idempotent GET once after a transient Core 503', async () => {
+    const me = meResponse();
+    let calls = 0;
+    coreApi.on('get', CORE.me, () => (calls++ === 0 ? coreError(503, 'Service Unavailable') : { body: me }));
+
+    const response = await profile(bearer());
+
+    expect(response.status).toBe(200);
+    expectBffContract('get', '/example/profile', response);
+    expect(response.body).toEqual(profileOf(me));
+    expect(coreApi.requests).toHaveLength(2);
+  });
+
+  test('does not retry a Core 500 (not transient)', async () => {
+    coreApi.on('get', CORE.me, coreError(500));
+
+    const response = await profile(bearer());
+
+    expect(response.status).toBe(502);
+    expect(coreApi.requests).toHaveLength(1);
+  });
+
   test('answers 502 when Core answers a body without the profile fields', async () => {
     coreApi.on('get', CORE.me, { body: { email: 'anne@mairie.test' }, outOfContract: true });
 

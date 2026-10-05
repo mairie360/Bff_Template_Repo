@@ -1,62 +1,34 @@
-import express from 'express';
 import request from 'supertest';
-import { createRateLimiter, RATE_LIMIT_MESSAGE, securityHeaders } from '../src/security';
+import app from '../src/app';
 
-describe('securityHeaders', () => {
-  const app = express();
-  app.use(securityHeaders);
-  app.get('/ping', (_req, res) => res.json({ ok: true }));
-
-  it('sets the helmet security headers and hides X-Powered-By', async () => {
-    const res = await request(app).get('/ping');
+// The headers come from @mairie360/bffs-lib (securityHeaders + apiOnlyHeaders), tested there; these
+// tests check that the app mounts them where the template expects.
+describe('security headers of the app', () => {
+  it('sets the helmet headers and the strict API-only headers on API routes', async () => {
+    const res = await request(app).get('/health');
 
     expect(res.status).toBe(200);
     expect(res.headers['x-powered-by']).toBeUndefined();
     expect(res.headers['x-content-type-options']).toBe('nosniff');
-    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
-    expect(res.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+    expect(res.headers['content-security-policy']).toBe("default-src 'none'");
+    expect(res.headers['permissions-policy']).toBe('geolocation=(), camera=(), microphone=()');
     expect(res.headers['cross-origin-resource-policy']).toBe('same-origin');
     expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     expect(res.headers['strict-transport-security']).toBeDefined();
   });
-});
 
-describe('createRateLimiter', () => {
-  const appWith = (limiter: express.RequestHandler) => {
-    const app = express();
-    app.use(express.json());
-    app.post('/login', limiter, (req, res) => (
-      req.body?.password === 'good' ? res.json({ ok: true }) : res.status(401).json({ error: { message: 'Invalid credentials' } })
-    ));
-    return app;
-  };
+  it('keeps the helmet CSP (no default-src none) on /docs, which needs scripts and styles', async () => {
+    const res = await request(app).get('/docs/');
 
-  it('answers 429 with Retry-After once the failed attempts of a key exceed the limit', async () => {
-    const app = appWith(createRateLimiter({ limit: 2, windowMs: 60_000, keyOf: (req) => String(req.body?.email ?? '') }));
-
-    expect((await request(app).post('/login').send({ email: 'a@x.fr' })).status).toBe(401);
-    expect((await request(app).post('/login').send({ email: 'A@x.fr' })).status).toBe(401);
-    const blocked = await request(app).post('/login').send({ email: 'a@x.fr', password: 'good' });
-
-    expect(blocked.status).toBe(429);
-    expect(blocked.body).toEqual({ error: { code: 'TOO_MANY_REQUESTS', message: RATE_LIMIT_MESSAGE, details: [] } });
-    expect(blocked.headers['retry-after']).toBeDefined();
-    expect((await request(app).post('/login').send({ email: 'b@x.fr' })).status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+    expect(res.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
   });
 
-  it('does not count successful requests by default', async () => {
-    const app = appWith(createRateLimiter({ limit: 1, windowMs: 60_000 }));
+  it('marks session-bound answers no-store, even the 401', async () => {
+    const res = await request(app).get('/example/profile');
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      expect((await request(app).post('/login').send({ password: 'good' })).status).toBe(200);
-    }
-  });
-
-  it('never limits when disabled', async () => {
-    const app = appWith(createRateLimiter({ limit: 1, windowMs: 60_000, enabled: false }));
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      expect((await request(app).post('/login').send({})).status).toBe(401);
-    }
+    expect(res.status).toBe(401);
+    expect(res.headers['cache-control']).toBe('no-store');
   });
 });

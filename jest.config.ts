@@ -14,7 +14,9 @@ export default {
   },
   transformIgnorePatterns: ['/node_modules/(?!@mairie360/)'],
   collectCoverage: true,
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts'],
+  // src/index.ts only runs as a real process (tests/startup.test.ts spawns it), out of reach of the
+  // in-process coverage: everything it starts (src/app.ts) is measured.
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/index.ts'],
   coverageReporters: ['text-summary', 'lcov'],
   coverageThreshold: {
     global: { branches: 60, functions: 60, lines: 60, statements: 60 },
