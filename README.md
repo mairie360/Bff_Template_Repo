@@ -8,11 +8,11 @@ package, and the ZAP / k6 test stacks with the OpenAPI coverage gate.
 ## Layout
 
 - `src/app.ts`: the Express app (security headers, JSON 404/400, `/docs`, `/openapi.json`,
-  `/swagger.json`); `src/index.ts` starts it on `PORT`.
+  `/swagger.json`); `src/index.ts` loads `.env` (`import 'dotenv/config'`, first line), checks the
+  upstream configuration with the lib's `assertConfigured` and starts the app on `PORT`.
 - `src/openapi-registry.ts`: the `zod-to-openapi` registry. Every route module in `src/routes/`
   registers its paths and schemas on import; `src/openapi.ts` imports them and builds the document.
-- `src/clients/`: `upstream.ts` (upstream base URL) and `coreClient.ts`, which wraps the generated
-  Core API client. The caller's session is read by `@mairie360/bffs-lib` only: `requireBearer` in
+- `src/clients/`: `coreClient.ts`, which wraps the generated Core API client. The caller's session is read by `@mairie360/bffs-lib` only: `requireBearer` in
   front of every session-bound router (401 before any upstream call) and `authorization(req)` to
   forward it. `Authorization: Bearer <token>` is the only credential; cookies and `x-session-token`
   are ignored (the fronts' proxy turns the `accessToken` cookie into the header). Wrap every other upstream API the same
@@ -23,6 +23,17 @@ package, and the ZAP / k6 test stacks with the OpenAPI coverage gate.
 - `tests/`: unit tests, the Core API contract tests (`upstream-contracts.test.ts`) and the whole
   app against a contract-driven Core API mock (`example.upstream-mocks.test.ts`). The files of
   `tests/support/` are shared verbatim with the BFFs: keep them identical.
+
+## Configuration
+
+Every upstream service is configured by `<SERVICE>_URL` (scheme optional, `http` by default) and
+optionally `<SERVICE>_PORT` (used when the URL has no port): `CORE_API`, `PROJECT_API`,
+`CALENDAR_API`, `MESSAGE_API`, `ELEARNING_API`, `USER_BFF`, `PROJECT_BFF`, `CALENDAR_BFF`, the names
+the Helm chart injects. The lib's `baseUrl('<SERVICE>')` reads them on every call: there is no
+`localhost` default and no URL frozen at import (never `axios.create({ baseURL })`). A missing or
+invalid variable makes the BFF refuse to start (`assertConfigured([...])` in `src/index.ts`, list
+every upstream there) and, if it disappears at runtime, the routes that need it answer 503 (declare
+it in their contract). `PORT` defaults to `4000`; `TRUST_PROXY`: see below. `.env.example` lists them.
 
 ## Commands
 
