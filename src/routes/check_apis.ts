@@ -1,21 +1,14 @@
+import { checkApis, checkApisResponseSchema, withoutSession } from '@mairie360/bffs-lib';
 import { Router } from 'express';
-import { z } from 'zod';
 import { registry } from '../openapi-registry';
-import { coreApi, withoutSession } from '../clients/coreClient';
+import { coreApi } from '../clients/coreClient';
 
 const router = Router();
 
-// One `<service>: Connected | Unreachable` entry per upstream API: add the other APIs the BFF calls
-// to UPSTREAMS, with their client's health operation.
-const UPSTREAMS = {
-  core_api: () => coreApi.health(withoutSession()),
-} as const;
-
-const Reachability = z.enum(['Connected', 'Unreachable']);
-export const CheckApisSchema = registry.register('CheckApisResponse', z.object({
-  status: z.enum(['OK', 'Error']).openapi({ example: 'OK' }),
-  core_api: Reachability.openapi({ example: 'Connected' }),
-}));
+// One `<name>: Connected | Unreachable` entry per upstream service the BFF calls, probed with the same
+// environment variables as the real calls: add each of them both to the schema and to the probes.
+// clone(): the lib builds the schema before extendZodWithOpenApi() (see openapi-registry.ts).
+export const CheckApisSchema = registry.register('CheckApisResponse', checkApisResponseSchema(['core_api']).clone());
 
 registry.registerPath({
   method: 'get',
@@ -29,15 +22,8 @@ registry.registerPath({
   },
 });
 
-router.get('/', async (_req, res) => {
-  const services = Object.entries(UPSTREAMS);
-  // Async callbacks: a missing configuration is a rejection instead of a throw outside the map.
-  const results = await Promise.allSettled(services.map(async ([, probe]) => probe()));
-  const ok = results.every((result) => result.status === 'fulfilled');
-  res.status(ok ? 200 : 502).json({
-    status: ok ? 'OK' : 'Error',
-    ...Object.fromEntries(services.map(([name], index) => [name, results[index].status === 'fulfilled' ? 'Connected' : 'Unreachable'])),
-  });
-});
+router.get('/', checkApis({
+  core_api: () => coreApi.health(withoutSession('CORE_API', 5_000)),
+}));
 
 export default router;

@@ -176,15 +176,9 @@ export interface components {
             };
         };
         CheckApisResponse: {
-            /**
-             * @example OK
-             * @enum {string}
-             */
+            /** @enum {string} */
             status: "OK" | "Error";
-            /**
-             * @example Connected
-             * @enum {string}
-             */
+            /** @enum {string} */
             core_api: "Connected" | "Unreachable";
         };
         Profile: {

@@ -107,27 +107,79 @@ family (50 ms for `/health`, 150 ms for `/check_apis`, 400 ms for reads, 800 ms 
 `contracts/openapi.json` is the reference of both gates: regenerate it with
 `npm run contracts:generate` after any route or schema change.
 
-## Security building blocks (`src/security.ts`)
+## Shared building blocks (`@mairie360/bffs-lib`)
 
-These helpers are meant to move to `@mairie360/bffs-lib`, which does not export them yet; until then,
-a BFF that needs them copies `src/security.ts`.
+Every BFF uses `@mairie360/bffs-lib` for what is common to all of them: **import it, never copy a
+helper into the BFF**. A generated BFF only keeps its routes, its upstream clients and its contract.
+What the template shows:
 
-- `securityHeaders`: `helmet` with the same configuration as BFF User (CSP without `upgrade-insecure-requests`, `X-Content-Type-Options`, CORP, no `X-Powered-By`), mounted first in `src/app.ts`.
-- `createRateLimiter(options)`: `express-rate-limit` to put in front of sensitive routes (sign-in, one-time tokens, password reset). Counts failed requests only by default and answers 429 with `Retry-After`. Environment: `RATE_LIMIT_ENABLED` (`false` disables it), `RATE_LIMIT_WINDOW_MS` (default 900000), `RATE_LIMIT_MAX` (default 10).
-- `TRUST_PROXY`: Express `trust proxy` (hop count, `true`, or trusted subnets), parsed by the lib's `parseTrustProxy`. Set it behind the ingress so that `req.ip`, and therefore the rate limits, is the real client and not the proxy.
+| Concern | In the template | From the lib |
+| --- | --- | --- |
+| Session | `app.use('/example', noStore, requireBearer, exampleRouter)` (`src/app.ts`) | `requireBearer` (401 before any upstream call), `authorization(req)` (normalised `Bearer <token>`), `bearerToken`, `unverifiedSubject` (only to shape a request sent upstream with the same token, never to grant access), `noStore` |
+| Upstream configuration | `assertConfigured([...])` in `src/index.ts`; every call passes the lib options | `baseUrl(service)`, `assertConfigured(services)` |
+| Upstream calls | `src/routes/example.ts` | `asCaller(service, req)`, `withoutSession(service, timeout)`, `callUpstream(service, call, { declared, retry })`, `upstreamError(service, error, declared)` |
+| Validation | (no input in the example) | `parseRequest(schema, req.body, 'body')`, `validationError(location, issues)`: 400 `Validation failed` with `<location>.<field>` details |
+| `/check_apis` | `src/routes/check_apis.ts` | `checkApis({ <name>: probe })`, `checkApisResponseSchema([names])` |
+| Security headers | `src/app.ts` | `securityHeaders` (helmet, mounted first), `apiOnlyHeaders()` (`default-src 'none'` outside `/docs`) |
+| Rate limits | (none in the example) | `createRateLimiter(options)`, `sessionKey` |
+| Errors | `notFoundHandler` + `errorHandler()` closing `src/app.ts`, `ErrorResponse` in `src/openapi-registry.ts` | `HttpError`, `ErrorResponseSchema`, `mapUpstreamError` |
 
-## Errors (`@mairie360/bffs-lib`)
+### Upstream calls
+
+```ts
+const profile = await callUpstream(
+  'CORE_API',
+  async () => ProfileSchema.parse((await coreApi.getMe(asCaller('CORE_API', req))).data),
+  { declared: [401, 404], retry: true },
+);
+```
+
+- `asCaller` checks the session first (401), then reads `CORE_API_URL` (503 when missing); the
+  generated client never gets a `baseURL` at import.
+- `callUpstream` is the single mapping of upstream failures: the 4xx listed in `declared` (exactly the
+  statuses the route declares in its contract) are relayed with a generic message, no answer is a 502
+  `The CORE_API service is unavailable.`, an answer the BFF cannot parse a 502 `The CORE_API answer is
+  invalid.`, anything else a 502. The upstream body is never relayed.
+- `retry: true` retries once on no answer / 502 / 503 / 504: only for idempotent calls (GET), never a POST.
+
+### `/check_apis`
+
+One `<name>: Connected | Unreachable` entry per upstream the BFF calls, probed with the same
+variables as the real calls; 200 when all are reachable, 502 otherwise (both declared with the
+`CheckApisResponse` schema):
+
+```ts
+registry.register('CheckApisResponse', checkApisResponseSchema(['core_api', 'user_bff']).clone());
+router.get('/', checkApis({
+  core_api: () => coreApi.health(withoutSession('CORE_API', 5_000)),
+  user_bff: () => userBff.health(withoutSession('USER_BFF', 5_000)),
+}));
+```
+
+`.clone()`: the lib builds its schemas before `extendZodWithOpenApi()` runs, and zod 4 only adds
+`.openapi()` to schemas created after it (same for `ErrorResponseSchema` in `src/openapi-registry.ts`).
+
+### Security headers and rate limits
+
+- `securityHeaders`: `helmet` (CSP without `upgrade-insecure-requests`, `X-Content-Type-Options`,
+  CORP, no `X-Powered-By`), then `apiOnlyHeaders()` for the stricter JSON-API headers, both before
+  body parsing so that body-parse errors carry them too.
+- `createRateLimiter(options)`: `express-rate-limit` answering 429 in the error envelope with
+  `Retry-After`, for sensitive routes (sign-in, one-time tokens, password reset). Counts failed
+  requests only by default. Environment `<prefix>_ENABLED` (`false` disables it), `<prefix>_WINDOW_MS`
+  (default 900000), `<prefix>_MAX` (default 10), prefix `RATE_LIMIT` unless `envPrefix` is given.
+  Never key it on a `sub` decoded without verification: use `sessionKey` for a per-session key.
+- `TRUST_PROXY`: Express `trust proxy` (hop count, `true`, or trusted subnets), parsed by the lib's
+  `parseTrustProxy`. Set it behind the ingress so that `req.ip`, and therefore the rate limits, is the
+  real client and not the proxy.
+
+## Errors
 
 Every error is answered in the envelope shared by all the BFFs, `{ error: { code, message, details } }`,
 registered once as the `ErrorResponse` schema (`src/openapi-registry.ts`) and referenced by every error
-response of the contract:
-
-- routes throw `HttpError(status, message?)` (Express 5 forwards async rejections); `notFoundHandler`
-  and `errorHandler()` close `src/app.ts`, keep the status and turn anything unexpected into a generic 500;
-- a failed upstream call is thrown through `coreError(error, declared)`: only the upstream 4xx listed in
-  `declared` (the statuses the route's contract declares) are kept, anything else becomes a 502, and the
-  upstream body is never relayed;
-- the rate limiter answers its 429 in the same envelope.
+response of the contract: routes throw `HttpError(status, message?)` or let `callUpstream` /
+`parseRequest` throw (Express 5 forwards async rejections); `notFoundHandler` and `errorHandler()` close
+`src/app.ts`, keep the status and turn anything unexpected into a generic 500.
 
 ## Creating a BFF from this template
 
@@ -136,8 +188,12 @@ response of the contract:
   workflow name and `package_name`) and the default port in `src/index.ts`, `Dockerfile` and
   `.env.example`; name the package in `package.json` and the spec in `src/openapi.ts`;
 - replace `src/routes/example.ts` with the BFF's routes (import every route module in
-  `src/openapi.ts`), add the upstream API clients it needs in `src/clients/` and their probe in
-  `src/routes/check_apis.ts`, then run `npm run contracts:generate`;
+  `src/openapi.ts`, mount the session-bound routers behind `noStore, requireBearer`), add the upstream
+  clients it needs in `src/clients/` (no `baseURL`: calls pass `asCaller` / `withoutSession`), their
+  service in `assertConfigured` (`src/index.ts`) and their probe in `src/routes/check_apis.ts`, then
+  run `npm run contracts:generate`;
+- use `@mairie360/bffs-lib` for the session, upstream configuration, upstream errors, validation,
+  `/check_apis`, security headers and rate limits: do not copy or re-implement those helpers;
 - add the upstream APIs the BFF calls to both test stacks, and remove `bff-user` if it does not
   call it;
 - write one `load-test.js` handler per operation (writes restore the seed they change);
