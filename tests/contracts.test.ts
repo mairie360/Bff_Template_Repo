@@ -42,7 +42,7 @@ test('unknown routes and unparsable bodies answer JSON with the security headers
   expect(unknown.headers['content-security-policy']).toBe("default-src 'none'");
   expect(unknown.headers['x-content-type-options']).toBe('nosniff');
   expect(unknown.headers['x-powered-by']).toBeUndefined();
-  // helmet (src/security.ts) is mounted first: its headers are on every answer.
+  // The lib's securityHeaders (helmet) is mounted first: its headers are on every answer.
   expect(unknown.headers['strict-transport-security']).toBeDefined();
   expect(unknown.headers['cross-origin-opener-policy']).toBe('same-origin');
 

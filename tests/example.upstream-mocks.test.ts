@@ -1,3 +1,4 @@
+import axios from 'axios';
 import path from 'node:path';
 import request from 'supertest';
 import app from '../src/app';
@@ -83,6 +84,28 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
   });
 
   test.each([
+    ['an accessToken cookie', 'Cookie', 'accessToken=session-42'],
+    ['a session cookie', 'Cookie', 'session=session-42'],
+    ['an x-session-token header', 'x-session-token', 'session-42'],
+  ])('ignores %s: only the Bearer header is a session (401, no Core call)', async (_label, header, value) => {
+    const response = await request(app).get('/example/profile').set(header, value);
+
+    expect(response.status).toBe(401);
+    expectBffContract('get', '/example/profile', response);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(coreApi.requests).toHaveLength(0);
+  });
+
+  test('forwards the session normalised to `Bearer <token>`', async () => {
+    coreApi.on('get', CORE.me, { body: meResponse() });
+
+    const response = await profile('bearer   session-42');
+
+    expect(response.status).toBe(200);
+    expect(coreApi.requests[0].headers.authorization).toBe('Bearer session-42');
+  });
+
+  test.each([
     [401, 'UNAUTHORIZED', 'Authentication required'],
     [404, 'NOT_FOUND', 'Resource not found'],
   ])('keeps a declared Core %i with a generic message', async (status, code, message) => {
@@ -115,6 +138,28 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
     expect(JSON.stringify(response.body)).not.toContain('database');
   });
 
+  test('retries the idempotent GET once after a transient Core 503', async () => {
+    const me = meResponse();
+    let calls = 0;
+    coreApi.on('get', CORE.me, () => (calls++ === 0 ? coreError(503, 'Service Unavailable') : { body: me }));
+
+    const response = await profile(bearer());
+
+    expect(response.status).toBe(200);
+    expectBffContract('get', '/example/profile', response);
+    expect(response.body).toEqual(profileOf(me));
+    expect(coreApi.requests).toHaveLength(2);
+  });
+
+  test('does not retry a Core 500 (not transient)', async () => {
+    coreApi.on('get', CORE.me, coreError(500));
+
+    const response = await profile(bearer());
+
+    expect(response.status).toBe(502);
+    expect(coreApi.requests).toHaveLength(1);
+  });
+
   test('answers 502 when Core answers a body without the profile fields', async () => {
     coreApi.on('get', CORE.me, { body: { email: 'anne@mairie.test' }, outOfContract: true });
 
@@ -144,6 +189,15 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
     expectBffContract('get', '/example/profile', response);
     expect(response.body).toEqual({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The CORE_API service is not configured.', details: [] } });
   });
+
+  test('checks the session before the configuration: 401 without one, even when Core API is not configured', async () => {
+    delete process.env.CORE_API_URL;
+
+    const response = await profile();
+
+    expect(response.status).toBe(401);
+    expectBffContract('get', '/example/profile', response);
+  });
 });
 
 describe('GET /check_apis', () => {
@@ -166,5 +220,21 @@ describe('GET /check_apis', () => {
     expect(response.status).toBe(502);
     expectBffContract('get', '/check_apis', response);
     expect(response.body).toEqual({ status: 'Error', core_api: 'Unreachable' });
+  });
+
+  test('reports Core API unreachable without calling any default host when it is not configured', async () => {
+    delete process.env.CORE_API_URL;
+    const requestSpy = jest.spyOn(axios.Axios.prototype, 'request');
+
+    try {
+      const response = await request(app).get('/check_apis');
+
+      expect(response.status).toBe(502);
+      expectBffContract('get', '/check_apis', response);
+      expect(response.body).toEqual({ status: 'Error', core_api: 'Unreachable' });
+      expect(requestSpy).not.toHaveBeenCalled();
+    } finally {
+      requestSpy.mockRestore();
+    }
   });
 });

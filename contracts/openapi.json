@@ -81,16 +81,14 @@
             "enum": [
               "OK",
               "Error"
-            ],
-            "example": "OK"
+            ]
           },
           "core_api": {
             "type": "string",
             "enum": [
               "Connected",
               "Unreachable"
-            ],
-            "example": "Connected"
+            ]
           }
         },
         "required": [

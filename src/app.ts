@@ -1,31 +1,23 @@
 import 'dotenv/config';
-import { errorHandler, notFoundHandler } from '@mairie360/bffs-lib';
+import {
+  apiOnlyHeaders, errorHandler, noStore, notFoundHandler, parseTrustProxy, requireBearer, securityHeaders,
+} from '@mairie360/bffs-lib';
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './openapi';
 import healthRouter from './routes/health';
 import checkApis from './routes/check_apis';
 import exampleRouter from './routes/example';
-import { parseTrustProxy, securityHeaders } from './security';
 
 export const app = express();
 app.disable('x-powered-by');
-// Client IP (req.ip) used by the rate limiters: see parseTrustProxy.
+// Client IP (req.ip), the key of the lib's createRateLimiter: TRUST_PROXY behind the ingress.
 app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
-// Security headers on every response, /docs included; the stricter API-only headers below override them.
+// Security headers on every response (helmet, shared by every BFF), /docs included.
 app.use(securityHeaders);
-
-// API-only surface: no embedded content, so a hard default-src covers every route below.
-// Runs first (before body parsing) so it also covers body-parse error responses; /docs opts out.
-app.use((req, res, next) => {
-  if (!req.path.startsWith('/docs')) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', "default-src 'none'");
-    res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  }
-  next();
-});
+// API-only surface: stricter headers (`default-src 'none'`...) everywhere but /docs. Mounted before body
+// parsing so they also cover body-parse error responses.
+app.use(apiOnlyHeaders());
 
 app.use(express.json());
 
@@ -36,8 +28,9 @@ app.get(['/openapi.json', '/swagger.json'], (_req, res) => res.json(openApiDocum
 
 app.use('/health', healthRouter);
 app.use('/check_apis', checkApis);
-// Session-bound answers must never be cached by a proxy or the browser.
-app.use('/example', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); }, exampleRouter);
+// Session-bound routers: never cached by a proxy or the browser (noStore), and a 401 before any
+// upstream call when the request has no `Authorization: Bearer <token>` (requireBearer).
+app.use('/example', noStore, requireBearer, exampleRouter);
 
 // Unknown routes and every error end in the shared envelope `{ error: { code, message, details } }`:
 // the status of the error is kept (400 for an unparsable body, 401, 404, 502, 503...) and anything
