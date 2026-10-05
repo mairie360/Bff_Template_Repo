@@ -7,7 +7,8 @@ extendZodWithOpenApi(z);
 
 export const registry = new OpenAPIRegistry();
 
-// Credential read by `authorization()` (clients/upstream.ts) and forwarded to the upstream APIs.
+// The only credential a BFF accepts, read by the lib's `requireBearer` / `authorization()` and forwarded
+// to the upstream APIs (the fronts' proxy turns the `accessToken` cookie into this header).
 // The document requires it on every operation (`openapi.ts`); public operations opt out with
 // `security: []`. The ZAP OpenAPI coverage gate reads this to tell which operations must be
 // reached authenticated.

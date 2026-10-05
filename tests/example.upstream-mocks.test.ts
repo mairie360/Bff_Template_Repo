@@ -83,6 +83,28 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
   });
 
   test.each([
+    ['an accessToken cookie', 'Cookie', 'accessToken=session-42'],
+    ['a session cookie', 'Cookie', 'session=session-42'],
+    ['an x-session-token header', 'x-session-token', 'session-42'],
+  ])('ignores %s: only the Bearer header is a session (401, no Core call)', async (_label, header, value) => {
+    const response = await request(app).get('/example/profile').set(header, value);
+
+    expect(response.status).toBe(401);
+    expectBffContract('get', '/example/profile', response);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(coreApi.requests).toHaveLength(0);
+  });
+
+  test('forwards the session normalised to `Bearer <token>`', async () => {
+    coreApi.on('get', CORE.me, { body: meResponse() });
+
+    const response = await profile('bearer   session-42');
+
+    expect(response.status).toBe(200);
+    expect(coreApi.requests[0].headers.authorization).toBe('Bearer session-42');
+  });
+
+  test.each([
     [401, 'UNAUTHORIZED', 'Authentication required'],
     [404, 'NOT_FOUND', 'Resource not found'],
   ])('keeps a declared Core %i with a generic message', async (status, code, message) => {

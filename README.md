@@ -11,8 +11,11 @@ package, and the ZAP / k6 test stacks with the OpenAPI coverage gate.
   `/swagger.json`); `src/index.ts` starts it on `PORT`.
 - `src/openapi-registry.ts`: the `zod-to-openapi` registry. Every route module in `src/routes/`
   registers its paths and schemas on import; `src/openapi.ts` imports them and builds the document.
-- `src/clients/`: `upstream.ts` (caller session, upstream base URL, error answers) and
-  `coreClient.ts`, which wraps the generated Core API client. Wrap every other upstream API the same
+- `src/clients/`: `upstream.ts` (upstream base URL) and `coreClient.ts`, which wraps the generated
+  Core API client. The caller's session is read by `@mairie360/bffs-lib` only: `requireBearer` in
+  front of every session-bound router (401 before any upstream call) and `authorization(req)` to
+  forward it. `Authorization: Bearer <token>` is the only credential; cookies and `x-session-token`
+  are ignored (the fronts' proxy turns the `accessToken` cookie into the header). Wrap every other upstream API the same
   way, from its `@mairie360/<name>-api-openapi` package.
 - `src/routes/`: `GET /health`, `GET /check_apis` (upstream reachability) and an example
   authenticated route, `GET /example/profile`, which forwards the caller's session to Core API.
@@ -100,7 +103,7 @@ a BFF that needs them copies `src/security.ts`.
 
 - `securityHeaders`: `helmet` with the same configuration as BFF User (CSP without `upgrade-insecure-requests`, `X-Content-Type-Options`, CORP, no `X-Powered-By`), mounted first in `src/app.ts`.
 - `createRateLimiter(options)`: `express-rate-limit` to put in front of sensitive routes (sign-in, one-time tokens, password reset). Counts failed requests only by default and answers 429 with `Retry-After`. Environment: `RATE_LIMIT_ENABLED` (`false` disables it), `RATE_LIMIT_WINDOW_MS` (default 900000), `RATE_LIMIT_MAX` (default 10).
-- `TRUST_PROXY`: Express `trust proxy` (hop count, `true`, or trusted subnets). Set it behind the ingress so that `req.ip`, and therefore the rate limits, is the real client and not the proxy.
+- `TRUST_PROXY`: Express `trust proxy` (hop count, `true`, or trusted subnets), parsed by the lib's `parseTrustProxy`. Set it behind the ingress so that `req.ip`, and therefore the rate limits, is the real client and not the proxy.
 
 ## Errors (`@mairie360/bffs-lib`)
 

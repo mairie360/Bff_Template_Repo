@@ -19,20 +19,6 @@ export const securityHeaders: RequestHandler = helmet({
   },
 });
 
-/**
- * Parses `TRUST_PROXY` into Express' `trust proxy` setting: unset or `false` → no proxy trusted
- * (default), `true` → every hop, an integer → number of trusted hops, anything else →
- * comma-separated trusted addresses/subnets (e.g. `loopback, 10.0.0.0/8`). Behind the ingress,
- * set it so that `req.ip` (and therefore the rate limits) is the real client, not the proxy.
- */
-export function parseTrustProxy(value: string | undefined): boolean | number | string {
-  const trimmed = value?.trim();
-  if (!trimmed || trimmed.toLowerCase() === 'false') return false;
-  if (trimmed.toLowerCase() === 'true') return true;
-  if (/^\d+$/.test(trimmed)) return Number(trimmed);
-  return trimmed;
-}
-
 export const RATE_LIMIT_MESSAGE = 'Too many attempts, please try again later';
 
 export interface RateLimiterOptions {

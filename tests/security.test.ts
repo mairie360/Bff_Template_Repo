@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { createRateLimiter, parseTrustProxy, RATE_LIMIT_MESSAGE, securityHeaders } from '../src/security';
+import { createRateLimiter, RATE_LIMIT_MESSAGE, securityHeaders } from '../src/security';
 
 describe('securityHeaders', () => {
   const app = express();
@@ -58,17 +58,5 @@ describe('createRateLimiter', () => {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       expect((await request(app).post('/login').send({})).status).toBe(401);
     }
-  });
-});
-
-describe('parseTrustProxy', () => {
-  it.each([
-    [undefined, false],
-    ['false', false],
-    ['true', true],
-    ['1', 1],
-    ['loopback, 10.0.0.0/8', 'loopback, 10.0.0.0/8'],
-  ])('parses %p as %p', (value, expected) => {
-    expect(parseTrustProxy(value)).toBe(expected);
   });
 });
