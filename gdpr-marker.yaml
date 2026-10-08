@@ -1,0 +1,24 @@
+# GDPR log marker journey (MAIR-290), played by mairie360/CICD tests/gdpr/marker.
+#
+# Template: list here the routes of the new BFF that receive or return personal data (free
+# text, searches, profile fields), with the marker's values in their bodies, in their query
+# strings and in deliberate errors (validation errors, wrong types, missing resources, invalid
+# token). The logs of every container of docker-compose-gdpr-marker.yml are then searched for
+# them (see gdpr_marker_test.sh and the GDPR log marker section of the mairie360/CICD README).
+# A log describes an error by its type and context, never by the value it received.
+version: 1
+target: http://bff-template:4000 #change bff name and port
+wait: /health
+# The admin JWT of the stack (sub=1, the seeded Admin), the same one the ZAP scan uses.
+env: [ADMIN_JWT]
+steps:
+  - name: read the profile
+    request: {method: GET, path: /example/profile, headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}}
+  - name: read the profile with a query string holding the marker
+    request: {method: GET, path: "/example/profile?search={{marker.email}}&name={{marker.last_name}}&phone={{marker.phone}}", headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}}
+  - name: read the profile with an invalid token (deliberate error)
+    request: {method: GET, path: "/example/profile?search={{marker.first_name}}", headers: {Authorization: "Bearer {{marker.password}}"}}
+    expect: [401]
+  - name: read a route that does not exist (deliberate error)
+    request: {method: GET, path: "/example/{{marker.last_name}}?email={{marker.email}}", headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}}
+    expect: [404]
