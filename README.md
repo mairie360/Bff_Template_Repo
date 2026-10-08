@@ -35,6 +35,14 @@ invalid variable makes the BFF refuse to start (`assertConfigured([...])` in `sr
 every upstream there) and, if it disappears at runtime, the routes that need it answer 503 (declare
 it in their contract). `PORT` defaults to `4000`; `TRUST_PROXY`: see below. `.env.example` lists them.
 
+Telemetry (MAIR-504): `src/telemetry.ts` starts the lib's OpenTelemetry and is imported by `src/index.ts`
+right after `dotenv/config`, before the app, so that Express is instrumented (keep that order). Traces and
+HTTP metrics go over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT` (the collector of the instance, e.g.
+`http://otel-collector:4318`); unset, telemetry is off and tests export nothing. `OTEL_SERVICE_NAME` and
+`OTEL_RESOURCE_ATTRIBUTES` (`service.version=<image tag>,deployment.environment.name=prod`) complete the
+resource, `OTEL_SDK_DISABLED=true` turns it off. Only the lib's attribute allowlist is exported (method,
+status, parameterised route, upstream host): never add span attributes holding request values.
+
 ## Commands
 
 `@mairie360/*` packages come from GitHub Packages: export `NODE_AUTH_TOKEN` (a token with
@@ -186,7 +194,8 @@ response of the contract: routes throw `HttpError(status, message?)` or let `cal
 - on the lines marked `#change ...`, replace the name `template` and the port `4000`
   (`docker-compose*.yml`, `security_test.sh`, `performance_test.sh`, `.github/workflows/cicd.yml`:
   workflow name and `package_name`) and the default port in `src/index.ts`, `Dockerfile` and
-  `.env.example`; name the package in `package.json` and the spec in `src/openapi.ts`;
+  `.env.example`; name the package in `package.json`, the spec in `src/openapi.ts` and the
+  telemetry service in `src/telemetry.ts`;
 - replace `src/routes/example.ts` with the BFF's routes (import every route module in
   `src/openapi.ts`, mount the session-bound routers behind `noStore, requireBearer`), add the upstream
   clients it needs in `src/clients/` (no `baseURL`: calls pass `asCaller` / `withoutSession`), their
