@@ -51,8 +51,8 @@ npm run contracts:check      # CI gate: fails when contracts/ is stale
 ```
 
 **Upstream rules (MAIR-525).** A BFF calls the APIs, never another BFF, unless it reuses non-trivial business logic
-no API has (say why in the code and the PR). The caller's roles come from the verified token (`sessionRoles` of
-`@mairie360/bffs-lib`), or from Core API for a token without the `roles` claim. Independent upstream calls start
+no API has (say why in the code and the PR). The caller's role comes from the verified token (`sessionRole` of
+`@mairie360/bffs-lib`), or from Core API for a token without the `role` claim. Independent upstream calls start
 together (`Promise.all`, the lib's `mapWithConcurrency` / `readOffsetPages` for lists); ESLint `no-await-in-loop`
 is an error and a loop that must stay sequential disables it on that line with a comment saying why. The shared
 `tests/support/contract-mock-server.ts` has `delayMs` and `maxInFlight` to test it.
