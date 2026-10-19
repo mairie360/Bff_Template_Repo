@@ -58,6 +58,13 @@ npm run contracts:generate   # after any route, schema or status change: commit 
 npm run contracts:check      # CI gate: fails when contracts/ is stale
 ```
 
+**Upstream rules (MAIR-525).** A BFF calls the APIs, never another BFF, unless it reuses non-trivial business logic
+no API has (say why in the code and the PR). The caller's role comes from the verified token (`sessionRole` of
+`@mairie360/bffs-lib`), or from Core API for a token without the `role` claim. Independent upstream calls start
+together (`Promise.all`, the lib's `mapWithConcurrency` / `readOffsetPages` for lists); ESLint `no-await-in-loop`
+is an error and a loop that must stay sequential disables it on that line with a comment saying why. The shared
+`tests/support/contract-mock-server.ts` has `delayMs` and `maxInFlight` to test it.
+
 `docker compose up --build` runs the BFF alone against a Core API on the host's port 3000
 (`CORE_API_URL` overrides it). The production `Dockerfile` and `development.Dockerfile` read the
 GitHub Packages credentials from BuildKit secrets:
