@@ -1,8 +1,9 @@
--- Minimal seed for the isolated test stacks (performance / security) of the BFF.
+-- Minimal seed for the isolated test stacks (performance / security / integration) of the BFF.
 -- The test JWTs reference two users:
 --   * sub = "1": Admin role. docker-compose-security.yml injects a static token for it
 --     through the ZAP replacer, so every operation is scanned authenticated;
 --   * sub = "2": User role only, for the performance test.
+-- The newman collection (tests/postman/) forges a JWT for each of them (`admin` / `agent`).
 -- Add here the rows that the examples of the contract name (ids of path parameters,
 -- referenced users...), with a distinct row for the examples of the DELETE routes.
 

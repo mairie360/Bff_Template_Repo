@@ -1,0 +1,329 @@
+{
+  "info": {
+    "name": "BFF Template integration tests",
+    "description": "MAIR-262: working checks (the BFF starts, reaches Core API, serves its contract) and the session resolution of the example route, replayed by newman on docker-compose-integration.yml (./integration_test.sh). The seeded Admin (user 1) and agent (user 2) are impersonated with JWTs forged from the JWT_SECRET of the stack. In a BFF generated from the template, replace the example route with the bootstrap route of the BFF and add one folder per business journey: each journey creates its own data (unique names with {{run_id}}), reads it back, updates it, checks what the fronts rely on and deletes it at the end, so the collection stays replayable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// One fresh account per run so the collection is replayable against a persistent database.",
+          "if (!pm.environment.get('run_id')) {",
+          "    pm.environment.set('run_id', String(Date.now()));",
+          "}",
+          "if (!pm.environment.get('test_user_email')) {",
+          "    pm.environment.set('test_user_email', `newman.${pm.environment.get('run_id')}@mairie360.test`);",
+          "}",
+          "// The seeded accounts have no known password: forge their JWT exactly like mairie360_api_lib::jwt_manager",
+          "// does (HS256, claims { sub, role, exp }), signed with the JWT_SECRET of the stack, injected by",
+          "// docker-compose-integration.yml (random per run, MAIR-428). `role` is the claim the BFFs read (MAIR-529).",
+          "const cryptoJs = require('crypto-js');",
+          "const b64url = (words) => cryptoJs.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "const signJwt = (sub, role) => {",
+          "    const header = b64url(cryptoJs.enc.Utf8.parse(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));",
+          "    const payload = b64url(cryptoJs.enc.Utf8.parse(JSON.stringify({ sub: String(sub), role, exp: Math.floor(Date.now() / 1000) + 3600 })));",
+          "    return `${header}.${payload}.${b64url(cryptoJs.HmacSHA256(`${header}.${payload}`, pm.environment.get('jwt_secret')))}`;",
+          "};",
+          "pm.environment.set('jwt_admin', signJwt(pm.environment.get('admin_user_id'), 'admin'));",
+          "pm.environment.set('jwt_agent', signJwt(pm.environment.get('agent_user_id'), 'user'));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Body says ok\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upstream APIs are reachable",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/check_apis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "check_apis"
+              ]
+            },
+            "description": "One `Connected` entry per upstream API the BFF calls: add the others next to core_api."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Every upstream API is connected\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql('OK');",
+                  "    pm.expect(body.core_api).to.eql('Connected');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "OpenAPI document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "openapi.json"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Document lists the routes\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.openapi).to.be.a('string');",
+                  "    pm.expect(body.paths).to.have.property('/health');",
+                  "    pm.expect(body.paths).to.have.property('/example/profile');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Unknown route answers a JSON 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/newman/unknown-route",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "newman",
+                "unknown-route"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Body is the error envelope\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error, 'error').to.be.an('object');",
+                  "    pm.expect(body.error.code).to.be.a('string');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The BFF is up, reaches its upstream APIs and serves its contract."
+    },
+    {
+      "name": "Session resolution",
+      "item": [
+        {
+          "name": "Profile without a session is rejected",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/example/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "example",
+                "profile"
+              ]
+            },
+            "description": "requireBearer answers 401 before any upstream call."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Body is the error envelope\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error, 'error').to.be.an('object');",
+                  "    pm.expect(body.error.code).to.be.a('string');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Profile of the seeded administrator",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/example/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "example",
+                "profile"
+              ]
+            },
+            "description": "User 1 is the template admin seeded by liquibase (-Dallow_template_admin=true): its names are not fixed by init-test.sql, only the shape of the answer is checked."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "pm.test(\"Profile comes from Core API and only holds the contract fields\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.first_name).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.last_name).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.email).to.be.a('string').and.not.empty;",
+                  "    pm.expect(Object.keys(body).sort()).to.eql(['email', 'first_name', 'last_name']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Profile of the seeded agent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/example/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "example",
+                "profile"
+              ]
+            },
+            "description": "User 2 is the plain user of init-test.sql."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "pm.test(\"Profile is the seeded agent\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.first_name).to.eql('Perf');",
+                  "    pm.expect(body.last_name).to.eql('Tester');",
+                  "    pm.expect(body.email).to.eql('perf-tester@mairie360.fr');",
+                  "    pm.expect(body).to.not.have.any.keys('role', 'roles', 'groups', 'status', 'password');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The session comes from the Bearer JWT (requireBearer) and is resolved against Core API by the example route. Replace /example/profile with the bootstrap route of the BFF."
+    }
+  ]
+}
