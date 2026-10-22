@@ -56,6 +56,7 @@ npm run lint
 npm test                     # jest; CI runs npm test -- --runInBand
 npm run contracts:generate   # after any route, schema or status change: commit contracts/
 npm run contracts:check      # CI gate: fails when contracts/ is stale
+./integration_test.sh        # docker-compose-integration.yml: real Core API + newman replaying tests/postman/ (MAIR-262)
 ```
 
 **Upstream rules (MAIR-525).** A BFF calls the APIs, never another BFF, unless it reuses non-trivial business logic
@@ -84,6 +85,53 @@ Same workflows as every BFF:
   like a real BFF: it publishes a `bff-template` image and `@mairie360/bff-template-openapi` package.
 - `.github/workflows/contracts.yml` runs `contracts:check` and the tests on every push.
 - `.github/workflows/auto-approve.yml` approves Renovate PRs (only `pull-requests: write`).
+
+## Integration test stack (newman, MAIR-262)
+
+Jest tests mock Core API; `integration_test.sh` is the only test of the BFF on a real stack. It brings up
+`docker-compose-integration.yml` (the upstream services of the ZAP / k6 stacks: published Core API image,
+database + liquibase + `init-test.sql`, Redis) and a `newman` service that replays
+`tests/postman/collection.json` with `tests/postman/environment.json` against the BFF, `--bail` on the
+first failing request; the exit code of newman is the exit code of the script. Like the other stacks it
+tests the image named by `IMAGE_REF` (`bff-template:local` built from `development.Dockerfile` when
+empty), sources `stack_secrets.sh` (random `JWT_SECRET` per run, shared by the APIs, the BFF and the
+collection) and drops the volumes before and after. In CI it is the `integration_tests` staging gate of
+`promote-staging.yml` (mairie360/CICD `integration/bffs`) on the published `dev-<sha>` image: a failure
+blocks the promotion; the junit report (`newman-reports/newman.xml`, gitignored) is published as job
+summary and artifact.
+
+The collection is split in two kinds of checks, both on the BFF's own routes:
+
+- **working checks** (folders `Service`, `Session resolution`): the BFF starts, `/health`, `/check_apis`
+  with every upstream `Connected`, `/openapi.json`, a JSON 404, the session is resolved against Core API
+  (401 without a Bearer, the seeded Admin `sub=1` and agent `sub=2` through `/example/profile`, only the
+  contract fields in the answer, `Cache-Control: no-store`);
+- **business journeys** the fronts rely on: none in the template. A generated BFF replaces
+  `/example/profile` with its bootstrap route and adds one folder per journey: each journey creates its
+  own data (unique names with `{{run_id}}`), reads it back through the BFF, updates it, checks what the
+  fronts rely on and deletes it at the end, so the collection stays replayable; it adds the refusals only
+  a real upstream shows (403 of a plain user on an admin route, 404 after deletion, 409 on a duplicate).
+
+The seeded accounts have no known password: the collection-level pre-request script forges their JWTs
+(HS256 `{ sub, role, exp }`, like `mairie360_api_lib`) with the `jwt_secret` the compose file injects
+(`jwt_admin`, `jwt_agent`); the committed `environment.json` holds no secret or token (`baseUrl` is the
+host port, the compose file overrides it with `--env-var`). Isolated endpoint checks (validation errors,
+token refusals) stay in jest: the collection only holds journeys and the checks that need a real upstream.
+
+`tests/integration-collection.test.ts` guards the collection with the unit tests: every operation of
+`contracts/openapi.json` has at least one request (a new route needs its request), every request has a
+`pm.test`, every request targets a declared route (or `/openapi.json` / the 404 check), and the
+environment commits no secret (list there the keys of the environment that must stay empty). Edit the
+JSON directly (Postman v2.1), keeping one folder per journey and English names.
+
+### Non-regression tests of a bug fix
+
+Every bug fix ships three tests that fail on the old code and pass on the fix, named after the ticket or the bug:
+a **technical unit test** (jest: the upstream-mock suite or the unit test of the route / helper), a **technical
+integration test** (a request of `tests/postman/collection.json` that reproduces the bug on the real stack and pins
+the status, the error envelope and the answer's fields) and a **business integration test** (the journey of the
+collection that the bug broke, extended so that it replays the user flow end to end). Run `./integration_test.sh`
+before opening the PR; skip one of the three only when that layer cannot observe the bug, and say why in the PR.
 
 ## Security test stack (OWASP ZAP)
 
@@ -199,7 +247,8 @@ response of the contract: routes throw `HttpError(status, message?)` or let `cal
 ## Creating a BFF from this template
 
 - on the lines marked `#change ...`, replace the name `template` and the port `4000`
-  (`docker-compose*.yml`, `security_test.sh`, `performance_test.sh`, `.github/workflows/cicd.yml`:
+  (`docker-compose*.yml`, `security_test.sh`, `performance_test.sh`, `integration_test.sh`,
+  `.github/workflows/cicd.yml`:
   workflow name and `package_name`) and the default port in `src/index.ts`, `Dockerfile` and
   `.env.example`; name the package in `package.json`, the spec in `src/openapi.ts` and the
   telemetry service in `src/telemetry.ts`;
@@ -210,8 +259,13 @@ response of the contract: routes throw `HttpError(status, message?)` or let `cal
   run `npm run contracts:generate`;
 - use `@mairie360/bffs-lib` for the session, upstream configuration, upstream errors, validation,
   `/check_apis`, security headers and rate limits: do not copy or re-implement those helpers;
-- add the upstream APIs the BFF calls to both test stacks, and remove `bff-user` if it does not
-  call it;
+- add the upstream APIs the BFF calls to the three test stacks (`docker-compose-security.yml`,
+  `docker-compose-performance.yml`, `docker-compose-integration.yml`), and remove `bff-user` from the
+  ZAP / k6 stacks: since MAIR-525 a BFF calls the APIs only;
+- replace `/example/profile` in `tests/postman/collection.json` with the bootstrap route of the BFF, add
+  one folder per business journey and list in `tests/integration-collection.test.ts` the environment
+  keys that must stay empty (`tests/integration-collection.test.ts` fails on any operation of the
+  contract without a request);
 - write one `load-test.js` handler per operation (writes restore the seed they change);
 - give every request field, query and path parameter of the contract a valid example, with a
   distinct example for DELETE routes, and seed the rows they name in `init-test.sql`;
