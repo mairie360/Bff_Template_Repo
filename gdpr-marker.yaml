@@ -9,7 +9,7 @@
 version: 1
 target: http://bff-template:4000 #change bff name and port
 wait: /health
-# The admin JWT of the stack (sub=1, the seeded Admin), the same one the ZAP scan uses.
+# The admin JWT of the run (sub=1, the seeded Admin), signed by stack_secrets.sh with its random secret.
 env: [ADMIN_JWT]
 steps:
   - name: read the profile
