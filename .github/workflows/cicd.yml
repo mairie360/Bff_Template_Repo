@@ -9,9 +9,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Every permission a job of the reusable pipeline requests must be granted here, or GitHub refuses to
+# start the run (startup_failure): release-dev signs the image with cosign keyless (id-token: write).
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   CICD:

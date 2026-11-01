@@ -14,6 +14,15 @@ describe('CI workflows', () => {
     expect(activeLines.join('\n')).toMatch(/uses: mairie360\/CICD\/\.github\/workflows\/BFFs-cicd\.yml@v\d+\.\d+\.\d+/);
   });
 
+  // A reusable workflow cannot get more than its caller grants: without id-token: write (cosign keyless
+  // signature of release-dev, mairie360/CICD MAIR-416) every run of cicd.yml ended in startup_failure.
+  it('grants the permissions the reusable pipeline requests, id-token: write included', () => {
+    const permissions = /^permissions:\n((?:\s+.+\n)+)/m.exec(cicd)?.[1] ?? '';
+    for (const permission of ['contents: write', 'packages: write', 'id-token: write']) {
+      expect(permissions).toContain(permission);
+    }
+  });
+
   it('pins cicd_version to the tag of the reusable workflow', () => {
     const tag = /BFFs-cicd\.yml@(v\d+\.\d+\.\d+)/.exec(cicd)?.[1];
     const version = /^\s*cicd_version:\s*["']?(v\d+\.\d+\.\d+)/m.exec(cicd)?.[1];
