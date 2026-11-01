@@ -138,6 +138,39 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
     expect(JSON.stringify(response.body)).not.toContain('database');
   });
 
+  // MAIR-290: the cause of an upstream 502 is the axios error, which holds the caller's Bearer token and the
+  // upstream answer. Whatever the BFF writes about the failure (JSON log lines on stdout, stderr, console)
+  // describes it by its type and status, never by these values.
+  test('MAIR-290 logs an upstream failure without the token or the upstream body', async () => {
+    const written: string[] = [];
+    const keep = ((chunk: string | Uint8Array) => {
+      written.push(String(chunk));
+      return true;
+    });
+    jest.spyOn(process.stdout, 'write').mockImplementation(keep as typeof process.stdout.write);
+    jest.spyOn(process.stderr, 'write').mockImplementation(keep as typeof process.stderr.write);
+    for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      jest.spyOn(console, level).mockImplementation((...args: unknown[]) => {
+        written.push(args.map((arg) => (arg instanceof Error ? `${arg.stack} ${JSON.stringify(arg)}` : typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '));
+      });
+    }
+    try {
+      const token = 'session-jeanne-marker-290';
+      coreApi.on('get', CORE.me, coreError(500, 'No profile for jeanne.marker290@example.org, 06 12 34 56 78'));
+
+      const response = await profile(bearer(token));
+
+      expect(response.status).toBe(502);
+      const logs = written.join('\n');
+      expect(logs).toContain('502');
+      for (const value of [token, 'jeanne.marker290@example.org', '06 12 34 56 78']) {
+        expect(logs).not.toContain(value);
+      }
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
   test('retries the idempotent GET once after a transient Core 503', async () => {
     const me = meResponse();
     let calls = 0;
