@@ -76,7 +76,7 @@ services:
       - backend
 
   seeder:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     container_name: bff-template-sec-seeder #change bff name
     depends_on:
       liquibase:
@@ -91,7 +91,7 @@ services:
       - backend
 
   redis:
-    image: redis:8.4.0-bookworm
+    image: redis:8.4.0-bookworm@sha256:c22af04bb576503bf16b3e34a1fd2fd82de0f765afd866d2e380145e0af30d78
     container_name: bff-template-sec-redis #change bff name
     expose:
       - "6379"
@@ -140,7 +140,7 @@ services:
     # from the core-api-ready container below.
 
   core-api-ready:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     container_name: bff-template-sec-core-api-ready #change bff name
     depends_on:
       core-api:
@@ -206,7 +206,7 @@ services:
       start_period: 40s
 
   security-scan:
-    image: zaproxy/zap-stable
+    image: zaproxy/zap-stable@sha256:030d3df57735dacbb83464854758e674dd9ad01d79d12a129a8e58b1fd384238
     container_name: bff-template-sec-zap #change bff name
     depends_on:
       bff-template: #change bff name
