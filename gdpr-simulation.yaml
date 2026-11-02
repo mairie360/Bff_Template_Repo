@@ -1,0 +1,14 @@
+# GDPR usage simulation (MAIR-497), played by mairie360/CICD tests/gdpr/simulation on the test
+# stack only (docker-compose-gdpr-simulation.yml, gdpr_simulation_test.sh).
+#
+# Fictitious personas with unique values go through the marker journey of MAIR-290 through the BFF
+# (gdpr-marker.yaml); the logs of every container, the Redis keys, the database after the purge and
+# a sample of its free-text columns are then checked and reviewed (CICD analyze.mjs).
+version: 1
+journey: gdpr-marker.yaml
+personas: 4
+# The template only reads the profile, so nothing of a persona is stored. A new BFF that writes
+# what an agent types sets `erased: 1` and lists in `erase` the steps that delete it (see
+# BFF_Project: the journey deletes the project, the erase step checks it is gone), with the
+# captures of its journey.
+erased: 0
