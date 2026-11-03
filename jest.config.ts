@@ -2,6 +2,8 @@ export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts'],
+  // Core's public key for every test app (MAIR-680): the fixtures sign the session tokens like Core.
+  setupFiles: ['<rootDir>/tests/support/env.ts'],
   // The @mairie360/core-api-openapi client is published as TypeScript ESM (orval): ts-jest has to
   // compile it so the tests go through the real HTTP client. Its declarations are not type-checked,
   // nor are those of src/clients/coreClient.ts: under ts-jest, axios is typed through both index.d.ts

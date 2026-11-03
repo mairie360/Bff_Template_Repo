@@ -3,7 +3,7 @@ import path from 'node:path';
 import request from 'supertest';
 import app from '../src/app';
 import { ContractMockServer, unreachableUrl, type MockReply } from './support/contract-mock-server';
-import { bearer, coreApiUrls, meResponse, profileOf } from './support/core-fixtures';
+import { bearer, coreApiUrls, meResponse, profileOf, tokenOf } from './support/core-fixtures';
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
 
@@ -99,10 +99,10 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
   test('forwards the session normalised to `Bearer <token>`', async () => {
     coreApi.on('get', CORE.me, { body: meResponse() });
 
-    const response = await profile('bearer   session-42');
+    const response = await profile(`bearer   ${tokenOf('session-42')}`);
 
     expect(response.status).toBe(200);
-    expect(coreApi.requests[0].headers.authorization).toBe('Bearer session-42');
+    expect(coreApi.requests[0].headers.authorization).toBe(`Bearer ${tokenOf('session-42')}`);
   });
 
   test.each([
@@ -155,10 +155,10 @@ describe('GET /example/profile with a contract-driven Core API mock', () => {
       });
     }
     try {
-      const token = 'session-jeanne-marker-290';
+      const token = tokenOf('session-jeanne-marker-290');
       coreApi.on('get', CORE.me, coreError(500, 'No profile for jeanne.marker290@example.org, 06 12 34 56 78'));
 
-      const response = await profile(bearer(token));
+      const response = await profile(`Bearer ${token}`);
 
       expect(response.status).toBe(502);
       const logs = written.join('\n');
