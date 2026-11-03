@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import {
-  apiOnlyHeaders, errorHandler, noStore, notFoundHandler, parseTrustProxy, requireBearer, securityHeaders,
+  apiOnlyHeaders, errorHandler, noStore, notFoundHandler, parseTrustProxy, requireSession, securityHeaders,
 } from '@mairie360/bffs-lib';
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
@@ -29,8 +29,10 @@ app.get(['/openapi.json', '/swagger.json'], (_req, res) => res.json(openApiDocum
 app.use('/health', healthRouter);
 app.use('/check_apis', checkApis);
 // Session-bound routers: never cached by a proxy or the browser (noStore), and a 401 before any
-// upstream call when the request has no `Authorization: Bearer <token>` (requireBearer).
-app.use('/example', noStore, requireBearer, exampleRouter);
+// upstream call unless `Authorization: Bearer <token>` carries a session Core signed (requireSession):
+// verified with Core's public key JWT_PUBLIC_KEY (EdDSA, expiry, positive `sub`; MAIR-474, MAIR-680),
+// HS256 only while JWT_SECRET is still set (transition). The verified token is forwarded upstream.
+app.use('/example', noStore, requireSession, exampleRouter);
 
 // Unknown routes and every error end in the shared envelope `{ error: { code, message, details } }`:
 // the status of the error is kept (400 for an unparsable body, 401, 404, 502, 503...) and anything

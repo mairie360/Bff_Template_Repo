@@ -12,8 +12,10 @@ package, and the ZAP / k6 test stacks with the OpenAPI coverage gate.
   upstream configuration with the lib's `assertConfigured` and starts the app on `PORT`.
 - `src/openapi-registry.ts`: the `zod-to-openapi` registry. Every route module in `src/routes/`
   registers its paths and schemas on import; `src/openapi.ts` imports them and builds the document.
-- `src/clients/`: `coreClient.ts`, which wraps the generated Core API client. The caller's session is read by `@mairie360/bffs-lib` only: `requireBearer` in
-  front of every session-bound router (401 before any upstream call) and `authorization(req)` to
+- `src/clients/`: `coreClient.ts`, which wraps the generated Core API client. The caller's session is read by `@mairie360/bffs-lib` only: `requireSession` in
+  front of every session-bound router (401 before any upstream call unless the token is a session Core signed,
+  verified with Core's public key `JWT_PUBLIC_KEY`: EdDSA, expiry, positive `sub`; HS256 only while `JWT_SECRET` is
+  still set, MAIR-680; `src/index.ts` refuses to start without a key) and `authorization(req)` to
   forward it. `Authorization: Bearer <token>` is the only credential; cookies and `x-session-token`
   are ignored (the fronts' proxy turns the `accessToken` cookie into the header). Wrap every other upstream API the same
   way, from its `@mairie360/<name>-api-openapi` package.
@@ -94,8 +96,8 @@ database + liquibase + `init-test.sql`, Redis) and a `newman` service that repla
 `tests/postman/collection.json` with `tests/postman/environment.json` against the BFF, `--bail` on the
 first failing request; the exit code of newman is the exit code of the script. Like the other stacks it
 tests the image named by `IMAGE_REF` (`bff-template:local` built from `development.Dockerfile` when
-empty), sources `stack_secrets.sh` (random `JWT_SECRET` per run, shared by the APIs, the BFF and the
-collection) and drops the volumes before and after. In CI it is the `integration_tests` staging gate of
+empty), sources `stack_secrets.sh` (fresh Ed25519 key pair per run: Core signs, the BFF holds the public key
+only, MAIR-680) and drops the volumes before and after. In CI it is the `integration_tests` staging gate of
 `promote-staging.yml` (mairie360/CICD `integration/bffs`) on the published `dev-<sha>` image: a failure
 blocks the promotion; the junit report (`newman-reports/newman.xml`, gitignored) is published as job
 summary and artifact.
@@ -112,9 +114,10 @@ The collection is split in two kinds of checks, both on the BFF's own routes:
   fronts rely on and deletes it at the end, so the collection stays replayable; it adds the refusals only
   a real upstream shows (403 of a plain user on an admin route, 404 after deletion, 409 on a duplicate).
 
-The seeded accounts have no known password: the collection-level pre-request script forges their JWTs
-(HS256 `{ sub, role, exp }`, like `mairie360_api_lib`) with the `jwt_secret` the compose file injects
-(`jwt_admin`, `jwt_agent`); the committed `environment.json` holds no secret or token (`baseUrl` is the
+The seeded accounts have no known password and the Postman sandbox cannot sign EdDSA: `integration_test.sh` signs
+their JWTs with the run's key like Core and the compose file injects them (`jwt_admin`, `jwt_agent`, and
+`jwt_forged`, Core's `kid` with another key); the pre-request script only forges `jwt_hs256`, an HS256 Admin token.
+Both are refused in `Session resolution` (MAIR-680); the committed `environment.json` holds no secret or token (`baseUrl` is the
 host port, the compose file overrides it with `--env-var`). Isolated endpoint checks (validation errors,
 token refusals) stay in jest: the collection only holds journeys and the checks that need a real upstream.
 
@@ -139,7 +142,9 @@ before opening the PR; skip one of the three only when that layer cannot observe
 `docker-compose-security.yml`: database + migrations, `init-test.sql` seed, Redis, Core API,
 BFF User and this BFF, then `zap-api-scan.py` replays every operation of `/openapi.json` with a
 static admin JWT (`sub=1`, HS256, `JWT_SECRET=b"secret"` in every service) and fails on any
-WARN/FAIL alert not neutralized in `.zap/rules.tsv`.
+WARN/FAIL alert not neutralized in `.zap/rules.tsv`. These security and performance stacks predate MAIR-428 / MAIR-525 (static
+secret, Core 1.2.0, BFF User): the BFF accepts their HS256 token only because `JWT_SECRET` is set (HS256
+transition). Port them from a sibling BFF (`stack_secrets.sh`, EdDSA, MAIR-680) before relying on them.
 
 The stack never builds the BFF: it runs the image named by `IMAGE_REF`. In CI, that is the
 `dev-<sha>` image `release-dev` has just published, the same artifact that is then promoted to
@@ -178,7 +183,7 @@ What the template shows:
 
 | Concern | In the template | From the lib |
 | --- | --- | --- |
-| Session | `app.use('/example', noStore, requireBearer, exampleRouter)` (`src/app.ts`) | `requireBearer` (401 before any upstream call), `authorization(req)` (normalised `Bearer <token>`), `bearerToken`, `unverifiedSubject` (only to shape a request sent upstream with the same token, never to grant access), `noStore` |
+| Session | `app.use('/example', noStore, requireSession, exampleRouter)` (`src/app.ts`) | `requireSession` (401 before any upstream call unless Core's public key `JWT_PUBLIC_KEY` verifies the token, MAIR-680), `sessionKeysFromEnv` (startup check), `authorization(req)` (normalised `Bearer <token>`), `bearerToken`, `unverifiedSubject` (only to shape a request sent upstream with the same token, never to grant access), `noStore` |
 | Upstream configuration | `assertConfigured([...])` in `src/index.ts`; every call passes the lib options | `baseUrl(service)`, `assertConfigured(services)` |
 | Upstream calls | `src/routes/example.ts` | `asCaller(service, req)`, `withoutSession(service, timeout)`, `callUpstream(service, call, { declared, retry })`, `upstreamError(service, error, declared)` |
 | Validation | (no input in the example) | `parseRequest(schema, req.body, 'body')`, `validationError(location, issues)`: 400 `Validation failed` with `<location>.<field>` details |
@@ -253,7 +258,7 @@ response of the contract: routes throw `HttpError(status, message?)` or let `cal
   `.env.example`; name the package in `package.json`, the spec in `src/openapi.ts` and the
   telemetry service in `src/telemetry.ts`;
 - replace `src/routes/example.ts` with the BFF's routes (import every route module in
-  `src/openapi.ts`, mount the session-bound routers behind `noStore, requireBearer`), add the upstream
+  `src/openapi.ts`, mount the session-bound routers behind `noStore, requireSession`), add the upstream
   clients it needs in `src/clients/` (no `baseURL`: calls pass `asCaller` / `withoutSession`), their
   service in `assertConfigured` (`src/index.ts`) and their probe in `src/routes/check_apis.ts`, then
   run `npm run contracts:generate`;

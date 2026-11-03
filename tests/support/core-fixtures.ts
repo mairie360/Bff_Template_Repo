@@ -1,5 +1,6 @@
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
 import type { GetMeResponseView, Group } from '@mairie360/core-api-openapi/model';
+import { eddsaToken } from './session-keys';
 
 // Core API answers typed by the models of the installed @mairie360/core-api-openapi package: a field
 // added, removed or renamed by the contract breaks the compilation of the tests. They are also
@@ -32,5 +33,13 @@ export function profileOf(me: GetMeResponseView): Pick<GetMeResponseView, 'first
   return { first_name, last_name, email };
 }
 
-/** The BFF only checks the `Bearer <token>` shape: the token is forwarded as is to (mocked) Core API. */
-export const bearer = (token = 'session-anne') => `Bearer ${token}`;
+const tokens = new Map<string, string>();
+/**
+ * Session token of a named test session, signed like Core (EdDSA, MAIR-680), one per name for the whole run: the BFF
+ * verifies it (requireSession), then forwards it as is to (mocked) Core API.
+ */
+export function tokenOf(session = 'session-anne'): string {
+  if (!tokens.has(session)) tokens.set(session, eddsaToken(tokens.size + 1));
+  return tokens.get(session)!;
+}
+export const bearer = (session = 'session-anne') => `Bearer ${tokenOf(session)}`;

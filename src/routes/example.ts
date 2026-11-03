@@ -8,8 +8,8 @@ import { coreApi } from '../clients/coreClient';
 // Core API through the generated client and only exposes the fields its own contract declares. Replace
 // it with the routes of the BFF (and update load-test.js, init-test.sql and the tests accordingly).
 //
-// The router is mounted behind `noStore` and `requireBearer` (app.ts): a request without
-// `Authorization: Bearer <token>` gets a 401 before any upstream call. Validate request input with the
+// The router is mounted behind `noStore` and `requireSession` (app.ts): a request without an
+// `Authorization: Bearer <token>` Core signed gets a 401 before any upstream call (MAIR-680). Validate request input with the
 // lib too: `const body = parseRequest(UpdateSchema, req.body, 'body');` answers a 400 `Validation failed`
 // listing every `body.<field>` in error.
 
