@@ -41,6 +41,31 @@ describe('CI workflows', () => {
     for (const line of bases) expect(line).toMatch(/^FROM node:24-alpine@sha256:[0-9a-f]{64}(\s|$)/);
   });
 
+  // MAIR-741: the npm bundled with node:24-alpine carries HIGH CVEs (brace-expansion, tar, undici...)
+  // that fail the Trivy scan of Release Dev. The runtime stage only runs node, so it drops them.
+  it('removes npm, npx, corepack and yarn from the runtime stage of the Dockerfile', () => {
+    const stages = read('Dockerfile').split(/^FROM\s/im);
+    const runtime = stages[stages.length - 1];
+    expect(runtime).toMatch(/^CMD \["node", "dist\/index\.js"\]/m);
+    // One line per instruction: join the `\` continuations, then keep the RUN that deletes.
+    const removal = runtime
+      .replace(/\\\n/g, ' ')
+      .split('\n')
+      .find((line) => /^RUN\s.*\brm -rf\s/.test(line));
+    expect(removal).toBeDefined();
+    const removed = removal!.split(/\s+/);
+    for (const target of [
+      '/usr/local/lib/node_modules/npm',
+      '/usr/local/lib/node_modules/corepack',
+      '/usr/local/bin/npm',
+      '/usr/local/bin/npx',
+      '/usr/local/bin/corepack',
+      '/opt/yarn-*',
+    ]) {
+      expect(removed).toContain(target);
+    }
+  });
+
   it('approves only Renovate PRs, with pull-requests: write only', () => {
     const autoApprove = read('.github/workflows/auto-approve.yml');
     expect(autoApprove).toMatch(/if: github\.actor == 'renovate\[bot\]'/);
