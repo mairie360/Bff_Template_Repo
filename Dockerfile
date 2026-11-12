@@ -19,7 +19,11 @@ RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
 # --- Stage 2: runtime ---
 FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 ENV NODE_ENV=production
-RUN apk add --no-cache curl
+# The runtime only runs `node dist/index.js`: drop the package managers bundled with the base image
+# (their dependencies carry CVEs reported by the Trivy scan of the release).
+RUN apk add --no-cache curl \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+              /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-*
 
 WORKDIR /app
 # Files stay owned by root: the node user cannot modify the code it runs.
