@@ -1,16 +1,17 @@
 # Journal des releases — Bff_Template_Repo
 
-<!-- release-journal-state {"dev": "0aa1727671f161fa482ad9df83159353a46eeeb8", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-12 11:43 UTC"}} -->
+<!-- release-journal-state {"dev": "40f2bf66d59def0759486dd800c07b696d8ed900", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-13 04:44 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.0.0 | `eacae3c` | — |
 | staging | — | `eacae3c` | — |
-| dev | — | `0aa1727` | 2026-11-12 11:43 UTC |
+| dev | — | `40f2bf6` | 2026-11-13 04:44 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.0.0)
 
+- chore(deps): update mairie360 database schema to v3.4.0 (#87) ([#87](https://github.com/mairie360/Bff_Template_Repo/pull/87))
 - chore(deps): update node.js to 116b800 (#55) ([#55](https://github.com/mairie360/Bff_Template_Repo/pull/55))
 - fix: MAIR-741 Remove npm from the runtime image of the BFF template (#83) ([#83](https://github.com/mairie360/Bff_Template_Repo/pull/83))
 - feat: MAIR-497 GDPR - Usage simulation and AI review of logs and database before prod ([#74](https://github.com/mairie360/Bff_Template_Repo/pull/74))
@@ -41,6 +42,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- chore(deps): update mairie360 database schema to v3.4.0 (#87) ([#87](https://github.com/mairie360/Bff_Template_Repo/pull/87))
 - chore(deps): update node.js to 116b800 (#55) ([#55](https://github.com/mairie360/Bff_Template_Repo/pull/55))
 - fix: MAIR-741 Remove npm from the runtime image of the BFF template (#83) ([#83](https://github.com/mairie360/Bff_Template_Repo/pull/83))
 - feat: MAIR-497 GDPR - Usage simulation and AI review of logs and database before prod ([#74](https://github.com/mairie360/Bff_Template_Repo/pull/74))
@@ -80,5 +82,6 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-13 04:44 UTC | dev | — | `40f2bf6` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43366887673) |
 | 2026-11-12 11:43 UTC | dev | — | `0aa1727` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43210740650) |
 <!-- release-journal-history:end -->
