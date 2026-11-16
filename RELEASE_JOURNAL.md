@@ -1,16 +1,17 @@
 # Journal des releases — Bff_Template_Repo
 
-<!-- release-journal-state {"dev": "40f2bf66d59def0759486dd800c07b696d8ed900", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-13 04:44 UTC"}} -->
+<!-- release-journal-state {"dev": "7e4037124d118715162beaf6fad13f7a675fb232", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-16 14:25 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.0.0 | `eacae3c` | — |
 | staging | — | `eacae3c` | — |
-| dev | — | `40f2bf6` | 2026-11-13 04:44 UTC |
+| dev | — | `7e40371` | 2026-11-16 14:25 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.0.0)
 
+- test: MAIR-241 Test the BFF_user admin routes and raise the BFFs coverage thresholds (#86) ([#86](https://github.com/mairie360/Bff_Template_Repo/pull/86))
 - chore(deps): update mairie360 database schema to v3.4.0 (#87) ([#87](https://github.com/mairie360/Bff_Template_Repo/pull/87))
 - chore(deps): update node.js to 116b800 (#55) ([#55](https://github.com/mairie360/Bff_Template_Repo/pull/55))
 - fix: MAIR-741 Remove npm from the runtime image of the BFF template (#83) ([#83](https://github.com/mairie360/Bff_Template_Repo/pull/83))
@@ -42,6 +43,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- test: MAIR-241 Test the BFF_user admin routes and raise the BFFs coverage thresholds (#86) ([#86](https://github.com/mairie360/Bff_Template_Repo/pull/86))
 - chore(deps): update mairie360 database schema to v3.4.0 (#87) ([#87](https://github.com/mairie360/Bff_Template_Repo/pull/87))
 - chore(deps): update node.js to 116b800 (#55) ([#55](https://github.com/mairie360/Bff_Template_Repo/pull/55))
 - fix: MAIR-741 Remove npm from the runtime image of the BFF template (#83) ([#83](https://github.com/mairie360/Bff_Template_Repo/pull/83))
@@ -82,6 +84,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-16 14:25 UTC | dev | — | `7e40371` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43883599669) |
 | 2026-11-13 04:44 UTC | dev | — | `40f2bf6` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43366887673) |
 | 2026-11-12 11:43 UTC | dev | — | `0aa1727` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43210740650) |
 <!-- release-journal-history:end -->
