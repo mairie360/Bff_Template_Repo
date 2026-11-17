@@ -103,7 +103,9 @@ describe('token refusals of the contract operations', () => {
     async (_label, { method, uri }) => {
       const response = await request(app)[method](uri).set('Authorization', `Bearer ${genuine}`).send({});
 
-      expect(response.status).not.toBe(401);
+      // The genuine token passes the session check and reaches the (failing) upstream: 502, never 401.
+      expect(response.status).toBe(502);
+      expect(upstreamCalls).toBeGreaterThan(0);
     },
   );
 });
