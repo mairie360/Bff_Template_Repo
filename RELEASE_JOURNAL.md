@@ -1,16 +1,17 @@
 # Journal des releases — Bff_Template_Repo
 
-<!-- release-journal-state {"dev": "81e49e4e559ac1a96eac598e00b8308c89f43f8f", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-17 03:39 UTC"}} -->
+<!-- release-journal-state {"dev": "3f0f1c4ead26ae891343c252aa8e415b80051766", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-17 11:55 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.0.0 | `eacae3c` | — |
 | staging | — | `eacae3c` | — |
-| dev | — | `81e49e4` | 2026-11-17 03:39 UTC |
+| dev | — | `3f0f1c4` | 2026-11-17 11:55 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.0.0)
 
+- feat: MAIR-998 Test stacks follow the moving upstream tag of the stage (#89) ([#89](https://github.com/mairie360/Bff_Template_Repo/pull/89))
 - fix(deps): update typescript dependencies (#90) ([#90](https://github.com/mairie360/Bff_Template_Repo/pull/90))
 - test: MAIR-241 Test the BFF_user admin routes and raise the BFFs coverage thresholds (#86) ([#86](https://github.com/mairie360/Bff_Template_Repo/pull/86))
 - chore(deps): update mairie360 database schema to v3.4.0 (#87) ([#87](https://github.com/mairie360/Bff_Template_Repo/pull/87))
@@ -44,6 +45,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- feat: MAIR-998 Test stacks follow the moving upstream tag of the stage (#89) ([#89](https://github.com/mairie360/Bff_Template_Repo/pull/89))
 - fix(deps): update typescript dependencies (#90) ([#90](https://github.com/mairie360/Bff_Template_Repo/pull/90))
 - test: MAIR-241 Test the BFF_user admin routes and raise the BFFs coverage thresholds (#86) ([#86](https://github.com/mairie360/Bff_Template_Repo/pull/86))
 - chore(deps): update mairie360 database schema to v3.4.0 (#87) ([#87](https://github.com/mairie360/Bff_Template_Repo/pull/87))
@@ -86,6 +88,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-17 11:55 UTC | dev | — | `3f0f1c4` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/44077201380) |
 | 2026-11-17 03:39 UTC | dev | — | `81e49e4` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/44011152971) |
 | 2026-11-16 14:25 UTC | dev | — | `7e40371` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43883599669) |
 | 2026-11-13 04:44 UTC | dev | — | `40f2bf6` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/43366887673) |
