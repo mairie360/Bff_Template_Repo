@@ -30,7 +30,8 @@ x-db-env: &db-env
 name: bff-template-gdpr-sim
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:dev-c5b8e22}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     container_name: bff-template-sim-db #change bff name
     environment:
       POSTGRES_USER: postgres
@@ -50,7 +51,8 @@ services:
 
   liquibase:
     # Database >= MAIR-413 only seeds the template admin (users.id = 1) with -Dallow_template_admin=true.
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:dev-c5b8e22}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     container_name: bff-template-sim-liquibase #change bff name
     depends_on:
       postgres:
@@ -98,7 +100,8 @@ services:
       retries: 5
 
   core-api:
-    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:dev-3b40c2a}
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     container_name: bff-template-sim-core-api #change bff name
     depends_on:
       liquibase:
