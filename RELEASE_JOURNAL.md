@@ -1,16 +1,17 @@
 # Journal des releases — Bff_Template_Repo
 
-<!-- release-journal-state {"dev": "01521b9e5374a9cf47a4c79768114ac8634548ec", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-17 17:01 UTC"}} -->
+<!-- release-journal-state {"dev": "ae5b1838306f3ed6755f99db91a2cb6b3d983b14", "prod": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "prod_tag": "v1.0.0", "staging": "eacae3cb95b99504d7b173fbf7c7ba2ecefb4838", "updated": {"dev": "2026-11-18 01:02 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.0.0 | `eacae3c` | — |
 | staging | — | `eacae3c` | — |
-| dev | — | `01521b9` | 2026-11-17 17:01 UTC |
+| dev | — | `ae5b183` | 2026-11-18 01:02 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.0.0)
 
+- fix: MAIR-682 [Audit 23/10] All BFFs: graceful shutdown on SIGTERM (B7) (#94) ([#94](https://github.com/mairie360/Bff_Template_Repo/pull/94))
 - test: MAIR-538 Add cross-cutting timeout, 413 and token-refusal tests to the BFFs and the template ([#92](https://github.com/mairie360/Bff_Template_Repo/pull/92))
 - feat: MAIR-998 Test stacks follow the moving upstream tag of the stage (#89) ([#89](https://github.com/mairie360/Bff_Template_Repo/pull/89))
 - fix(deps): update typescript dependencies (#90) ([#90](https://github.com/mairie360/Bff_Template_Repo/pull/90))
@@ -46,6 +47,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- fix: MAIR-682 [Audit 23/10] All BFFs: graceful shutdown on SIGTERM (B7) (#94) ([#94](https://github.com/mairie360/Bff_Template_Repo/pull/94))
 - test: MAIR-538 Add cross-cutting timeout, 413 and token-refusal tests to the BFFs and the template ([#92](https://github.com/mairie360/Bff_Template_Repo/pull/92))
 - feat: MAIR-998 Test stacks follow the moving upstream tag of the stage (#89) ([#89](https://github.com/mairie360/Bff_Template_Repo/pull/89))
 - fix(deps): update typescript dependencies (#90) ([#90](https://github.com/mairie360/Bff_Template_Repo/pull/90))
@@ -90,6 +92,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-18 01:02 UTC | dev | — | `ae5b183` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/44212053241) |
 | 2026-11-17 17:01 UTC | dev | — | `01521b9` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/44131400782) |
 | 2026-11-17 11:55 UTC | dev | — | `3f0f1c4` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/44077201380) |
 | 2026-11-17 03:39 UTC | dev | — | `81e49e4` | [run](https://github.com/mairie360/Bff_Template_Repo/actions/runs/44011152971) |
