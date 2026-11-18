@@ -66,9 +66,9 @@ describe('CI workflows', () => {
     }
   });
 
-  it('approves only Renovate PRs, with pull-requests: write only', () => {
+  it('approves Renovate PRs through the CICD workflow, with pull-requests: write only', () => {
     const autoApprove = read('.github/workflows/auto-approve.yml');
-    expect(autoApprove).toMatch(/if: github\.actor == 'renovate\[bot\]'/);
+    expect(autoApprove).toMatch(/uses: mairie360\/CICD\/\.github\/workflows\/auto-approve\.yml@v\d+\.\d+\.\d+/);
     expect(autoApprove).toMatch(/pull-requests: write/);
     expect(autoApprove).not.toMatch(/contents: write/);
   });

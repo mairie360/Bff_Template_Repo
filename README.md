@@ -86,7 +86,7 @@ Same workflows as every BFF:
   tag and `cicd_version` aligned. The template runs it too, so its skeleton is scanned and load-tested
   like a real BFF: it publishes a `bff-template` image and `@mairie360/bff-template-openapi` package.
 - `.github/workflows/contracts.yml` runs `contracts:check` and the tests on every push.
-- `.github/workflows/auto-approve.yml` approves Renovate PRs (only `pull-requests: write`).
+- `.github/workflows/auto-approve.yml` calls the reusable auto-approval of mairie360/CICD: a Renovate PR is approved only while Renovate alone wrote and pushed it, and the approval is taken back after any other push (only `pull-requests: write`).
 
 ## Integration test stack (newman, MAIR-262)
 
