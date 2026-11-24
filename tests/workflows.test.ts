@@ -30,18 +30,18 @@ describe('CI workflows', () => {
     expect(version).toBe(tag);
   });
 
-  it('builds with Node 24, like contracts.yml and the images', () => {
-    expect(cicd).toMatch(/^\s*node_version:\s*["']24["']/m);
-    expect(read('.github/workflows/contracts.yml')).toMatch(/node-version:\s*["']24["']/);
+  it('builds with Node 26, like contracts.yml and the images', () => {
+    expect(cicd).toMatch(/^\s*node_version:\s*["']26["']/m);
+    expect(read('.github/workflows/contracts.yml')).toMatch(/node-version:\s*["']26["']/);
   });
 
   it.each(['Dockerfile', 'development.Dockerfile'])('pins every base image of %s by digest', (file) => {
     const bases = read(file).split('\n').filter((line) => /^FROM\s/i.test(line));
     expect(bases.length).toBeGreaterThan(0);
-    for (const line of bases) expect(line).toMatch(/^FROM node:24-alpine@sha256:[0-9a-f]{64}(\s|$)/);
+    for (const line of bases) expect(line).toMatch(/^FROM node:26-alpine@sha256:[0-9a-f]{64}(\s|$)/);
   });
 
-  // MAIR-741: the npm bundled with node:24-alpine carries HIGH CVEs (brace-expansion, tar, undici...)
+  // MAIR-741: the npm bundled with node:26-alpine carries HIGH CVEs (brace-expansion, tar, undici...)
   // that fail the Trivy scan of Release Dev. The runtime stage only runs node, so it drops them.
   it('removes npm, npx, corepack and yarn from the runtime stage of the Dockerfile', () => {
     const stages = read('Dockerfile').split(/^FROM\s/im);

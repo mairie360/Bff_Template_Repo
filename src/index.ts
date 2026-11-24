@@ -12,7 +12,7 @@ export const UPSTREAMS = ['CORE_API'] as const;
 /**
  * Fail fast: refuse to start, naming every missing or invalid upstream URL, or without a session key, instead of
  * answering 503. The session tokens are verified with Core's public key `JWT_PUBLIC_KEY` (MAIR-680, bffs-lib
- * requireSession); `JWT_SECRET` alone is still accepted during the transition (HS256 tokens).
+ * requireSession, bffs-lib >= 3: EdDSA only, `JWT_SECRET` is ignored and HS256 tokens are refused).
  */
 export function assertStartupConfiguration(): void {
   assertConfigured(UPSTREAMS);
@@ -24,7 +24,7 @@ export function assertStartupConfiguration(): void {
     throw new Error('Invalid configuration: JWT_PUBLIC_KEY must hold Ed25519 PUBLIC KEY PEM blocks');
   }
   if (keys === undefined) {
-    throw new Error('Missing configuration: JWT_PUBLIC_KEY (or JWT_SECRET during the HS256 transition)');
+    throw new Error('Missing configuration: JWT_PUBLIC_KEY');
   }
 }
 
