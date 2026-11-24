@@ -141,9 +141,9 @@ before opening the PR; skip one of the three only when that layer cannot observe
 `./security_test.sh` (with `NODE_AUTH_TOKEN` exported) starts the isolated stack of
 `docker-compose-security.yml`: database + migrations, `init-test.sql` seed, Redis, Core API,
 BFF User and this BFF, then `zap-api-scan.py` replays every operation of `/openapi.json` with a
-static admin JWT (`sub=1`, HS256, `JWT_SECRET=b"secret"` in every service) and fails on any
-WARN/FAIL alert not neutralized in `.zap/rules.tsv`. These security and performance stacks predate MAIR-428 / MAIR-525 (static
-secret, Core 1.2.0, BFF User): since bffs-lib 3 the BFF refuses their HS256 token (MAIR-680), so they cannot pass. Port them from a sibling BFF (`stack_secrets.sh`, EdDSA, MAIR-680) before relying on them.
+the admin JWT of the run (`sub=1`, EdDSA, signed by `stack_secrets.sh` like Core signs it, MAIR-680) and fails on any
+WARN/FAIL alert not neutralized in `.zap/rules.tsv`. `security_test.sh` and `performance_test.sh` source `stack_secrets.sh`: a fresh
+Ed25519 key pair per run, Core gets the pair, the BFFs only the public key, no `JWT_SECRET` anywhere and nothing committed.
 
 The stack never builds the BFF: it runs the image named by `IMAGE_REF`. In CI, that is the
 `dev-<sha>` image `release-dev` has just published, the same artifact that is then promoted to
