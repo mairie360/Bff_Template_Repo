@@ -28,6 +28,11 @@ if [ ! -f "$CICD_DIR/tests/k6/coverage.js" ]; then
   git clone --quiet --depth 1 --branch "$CICD_VERSION" https://github.com/mairie360/CICD "$CICD_DIR" || exit 1
 fi
 
+# Fresh Ed25519 key pair for this run (MAIR-680): Core signs the session JWTs with it, the BFFs only
+# get the public key, and the runner's token is signed like Core signs it. Nothing is committed.
+# shellcheck source=stack_secrets.sh
+source ./stack_secrets.sh || exit 1
+
 echo "==> [1/4] Starting the stack and the ZAP scan..."
 docker compose -f "$COMPOSE_FILE" up -d
 

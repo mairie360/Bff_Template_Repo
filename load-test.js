@@ -1,7 +1,5 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import crypto from 'k6/crypto';
-import encoding from 'k6/encoding';
 import { createCoverage } from '/coverage.js';
 
 // ---------------------------------------------------------------------------
@@ -20,23 +18,13 @@ import { createCoverage } from '/coverage.js';
 // Every operation gets a p(95) threshold, whose budget depends on its family (`budgetOf`).
 // ---------------------------------------------------------------------------
 
-// Must match the JWT_SECRET of the services of the test stack.
-const JWT_SECRET = __ENV.JWT_SECRET || 'b"secret"';
-// User role only, seeded by init-test.sql (sub of the token).
-const USER_ID = __ENV.PERF_USER_ID || '2';
+// Session of the user init-test.sql seeds (sub=2, role user): an EdDSA JWT signed like Core by
+// performance_test.sh with the run's key (MAIR-680). k6 cannot sign Ed25519, so the token is passed in.
+const USER_JWT = __ENV.USER_JWT;
 
-function b64url(value) {
-  return encoding.b64encode(value, 'rawurl');
-}
-
-// Minimal HS256 JWT accepted by Core API (sub + role + exp claims).
-function mintJwt(sub, role) {
-  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const now = Math.floor(Date.now() / 1000);
-  const payload = b64url(JSON.stringify({ sub, role, exp: now + 3600 }));
-  const signingInput = `${header}.${payload}`;
-  const signature = crypto.hmac('sha256', JWT_SECRET, signingInput, 'base64rawurl');
-  return `${signingInput}.${signature}`;
+function userToken() {
+  if (!USER_JWT) throw new Error('USER_JWT is not set: run ./performance_test.sh, which signs it.');
+  return USER_JWT;
 }
 
 const handlers = {
@@ -104,7 +92,7 @@ export const options = {
 };
 
 export function setup() {
-  return { user: { Authorization: `Bearer ${mintJwt(USER_ID, 'user')}` } };
+  return { user: { Authorization: `Bearer ${userToken()}` } };
 }
 
 // Every GET handler, with a plain request() (no coverage accounting: `crud` owns the gate).

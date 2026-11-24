@@ -28,6 +28,14 @@ if [ ! -f "$CICD_DIR/tests/k6/coverage.js" ]; then
   git clone --quiet --depth 1 --branch "$CICD_VERSION" https://github.com/mairie360/CICD "$CICD_DIR" || exit 1
 fi
 
+# Fresh Ed25519 key pair for this run (MAIR-680): Core signs the session JWTs with it, the BFFs only
+# get the public key, and the runner's token is signed like Core signs it. Nothing is committed.
+# shellcheck source=stack_secrets.sh
+source ./stack_secrets.sh || exit 1
+# The load test runs as the seeded user (sub=2, role user).
+USER_JWT="$(sign_jwt 2 user 14400)" || exit 1
+export USER_JWT
+
 echo "==> [1/4] Starting the stack and the k6 test..."
 docker compose -f "$COMPOSE_FILE" up -d
 
