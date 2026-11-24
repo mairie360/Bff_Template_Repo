@@ -14,8 +14,8 @@ package, and the ZAP / k6 test stacks with the OpenAPI coverage gate.
   registers its paths and schemas on import; `src/openapi.ts` imports them and builds the document.
 - `src/clients/`: `coreClient.ts`, which wraps the generated Core API client. The caller's session is read by `@mairie360/bffs-lib` only: `requireSession` in
   front of every session-bound router (401 before any upstream call unless the token is a session Core signed,
-  verified with Core's public key `JWT_PUBLIC_KEY`: EdDSA, expiry, positive `sub`; HS256 only while `JWT_SECRET` is
-  still set, MAIR-680; `src/index.ts` refuses to start without a key) and `authorization(req)` to
+  verified with Core's public key `JWT_PUBLIC_KEY`: EdDSA, expiry, positive `sub`; HS256 tokens are refused and `JWT_SECRET`
+  is ignored since bffs-lib 3, MAIR-680; `src/index.ts` refuses to start without a key) and `authorization(req)` to
   forward it. `Authorization: Bearer <token>` is the only credential; cookies and `x-session-token`
   are ignored (the fronts' proxy turns the `accessToken` cookie into the header). Wrap every other upstream API the same
   way, from its `@mairie360/<name>-api-openapi` package.
@@ -143,8 +143,7 @@ before opening the PR; skip one of the three only when that layer cannot observe
 BFF User and this BFF, then `zap-api-scan.py` replays every operation of `/openapi.json` with a
 static admin JWT (`sub=1`, HS256, `JWT_SECRET=b"secret"` in every service) and fails on any
 WARN/FAIL alert not neutralized in `.zap/rules.tsv`. These security and performance stacks predate MAIR-428 / MAIR-525 (static
-secret, Core 1.2.0, BFF User): the BFF accepts their HS256 token only because `JWT_SECRET` is set (HS256
-transition). Port them from a sibling BFF (`stack_secrets.sh`, EdDSA, MAIR-680) before relying on them.
+secret, Core 1.2.0, BFF User): since bffs-lib 3 the BFF refuses their HS256 token (MAIR-680), so they cannot pass. Port them from a sibling BFF (`stack_secrets.sh`, EdDSA, MAIR-680) before relying on them.
 
 The stack never builds the BFF: it runs the image named by `IMAGE_REF`. In CI, that is the
 `dev-<sha>` image `release-dev` has just published, the same artifact that is then promoted to

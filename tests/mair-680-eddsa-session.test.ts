@@ -55,8 +55,9 @@ describe('MAIR-680 startup with the session public key', () => {
     expect(() => assertStartupConfiguration()).not.toThrow();
   });
 
-  it('MAIR-680 refuses to start without JWT_PUBLIC_KEY nor JWT_SECRET', () => {
+  it('MAIR-680 refuses to start without JWT_PUBLIC_KEY, even with JWT_SECRET set (bffs-lib 3)', () => {
     delete process.env.JWT_PUBLIC_KEY;
+    process.env.JWT_SECRET = TRANSITION_SECRET;
 
     expect(() => assertStartupConfiguration()).toThrow('Missing configuration: JWT_PUBLIC_KEY');
   });
@@ -99,13 +100,24 @@ describe(`MAIR-680 session tokens on GET ${ROUTE}`, () => {
     expect(upstreamCalls).toBe(0);
   });
 
-  it('MAIR-680 still accepts an HS256 token while JWT_SECRET is set (transition)', async () => {
+  it('MAIR-680 refuses an HS256 token with 401 even while JWT_SECRET is set (end of the transition, bffs-lib 3)', async () => {
     process.env.JWT_SECRET = TRANSITION_SECRET;
 
     const response = await request(app).get(ROUTE).set('Authorization', `Bearer ${hs256Token(1, TRANSITION_SECRET)}`);
 
-    expect(response.status).not.toBe(401);
-    expect(upstreamCalls).toBeGreaterThan(0);
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: expect.any(String), details: [] } });
+    expect(upstreamCalls).toBe(0);
+  });
+
+  it('MAIR-680 answers 503 when only JWT_SECRET is configured (bffs-lib 3 no longer reads it)', async () => {
+    delete process.env.JWT_PUBLIC_KEY;
+    process.env.JWT_SECRET = TRANSITION_SECRET;
+
+    const response = await request(app).get(ROUTE).set('Authorization', `Bearer ${hs256Token(1, TRANSITION_SECRET)}`);
+
+    expect(response.status).toBe(503);
+    expect(upstreamCalls).toBe(0);
   });
 
   it('MAIR-680 answers 503 without calling an upstream when no session key is configured', async () => {

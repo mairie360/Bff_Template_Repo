@@ -12,7 +12,7 @@
 # Template values: on the lines marked #change ..., replace `template` with the BFF name and 4000 with
 # its port, and add the upstream APIs the BFF calls (with their *-ready probe) next to core-api, exactly
 # as in docker-compose-security.yml. Since MAIR-525 a BFF calls the APIs only: no bff-user service here.
-# Every API of the stack needs the same JWT_SECRET (random per run, stack_secrets.sh) and the env the
+# Core signs the session JWTs with this run's Ed25519 key (stack_secrets.sh, MAIR-680), every API and the BFF get its public key, and the env the
 # security stack gives it (rate limits off, fake Resend for Core...).
 
 volumes:
@@ -72,7 +72,7 @@ services:
       - backend
 
   seeder:
-    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    image: postgres:19-alpine@sha256:cac45fb483caee3668946088a1c0532db89d5285c28dbfeac889b4068296e06f
     container_name: bff-template-int-seeder #change bff name
     depends_on:
       liquibase:
@@ -179,7 +179,7 @@ services:
       retries: 10
       start_period: 40s
 
-  # Replays tests/postman/collection.json against the BFF service. `baseUrl` and the JWT_SECRET of the run
+  # Replays tests/postman/collection.json against the BFF service. `baseUrl` and the tokens signed for the run
   # are injected here so the committed environment stays usable from a host shell; add one `--env-var`
   # per other service the collection reaches (a fake Resend journal, another API...). The reports
   # (junit) land in ./newman-reports (gitignored), read by the CI job summary.

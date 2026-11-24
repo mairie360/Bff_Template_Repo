@@ -31,7 +31,7 @@ app.use('/check_apis', checkApis);
 // Session-bound routers: never cached by a proxy or the browser (noStore), and a 401 before any
 // upstream call unless `Authorization: Bearer <token>` carries a session Core signed (requireSession):
 // verified with Core's public key JWT_PUBLIC_KEY (EdDSA, expiry, positive `sub`; MAIR-474, MAIR-680),
-// HS256 only while JWT_SECRET is still set (transition). The verified token is forwarded upstream.
+// HS256 tokens are refused (bffs-lib >= 3, JWT_SECRET is ignored). The verified token is forwarded upstream.
 app.use('/example', noStore, requireSession, exampleRouter);
 
 // Unknown routes and every error end in the shared envelope `{ error: { code, message, details } }`:
